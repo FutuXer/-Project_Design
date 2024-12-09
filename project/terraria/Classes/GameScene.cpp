@@ -2,6 +2,10 @@
 
 USING_NS_CC;
 
+const float gravity = -3.0f; // 重力加速度
+const float maxFallSpeed = -200.0f; // 最大下落速度
+bool overland = 0;
+
 Scene* GameScene::createScene()
 {
     return GameScene::create();
@@ -18,73 +22,16 @@ bool GameScene::init()
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
     // 创建地图
-    auto map = TMXTiledMap::create("testmap.tmx");
+    map = TMXTiledMap::create("testmap.tmx");
     if (!map)
     {
         CCLOG("Failed to load map.");
         return false;
     }
     map->setAnchorPoint(Vec2(0, 0));
-    map->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
     map->setScale(1.0f);
     map->setName("map"); // 设置名称
     this->addChild(map, 0);
-
-    // 创建主角
-    auto hero = Sprite::create("hero.png");
-    if (!hero)
-    {
-        CCLOG("Failed to load hero.");
-        return false;
-    }
-    // 主角初始位置设置为屏幕中心
-    hero->setPosition(visibleSize / 2);
-    hero->setName("hero"); // 设置名称
-    this->addChild(hero, 1); // 将主角添加到场景，而不是地图
-
-    // 调整地图初始位置，使屏幕中心对齐主角
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
-
-    Vec2 screenCenter = visibleSize / 2;
-    Vec2 heroTilePosition = Vec2(5 * tileSize.width, 5 * tileSize.height);
-    Vec2 mapInitialPosition = screenCenter - heroTilePosition;
-
-    // 边界限制
-    mapInitialPosition.x = std::min(mapInitialPosition.x, 0.0f); // 左边界
-    mapInitialPosition.x = std::max(mapInitialPosition.x, visibleSize.width - mapWidth); // 右边界
-    mapInitialPosition.y = std::min(mapInitialPosition.y, 0.0f); // 下边界
-    mapInitialPosition.y = std::max(mapInitialPosition.y, visibleSize.height - mapHeight); // 上边界
-
-    map->setPosition(mapInitialPosition);
-
-    // 添加键盘操作
-    addKeyboardListener(hero);
-
-    this->scheduleUpdate();
-
-    return true;
-}
-
-void GameScene::update(float delta)
-{
-    // 获取地图和主角
-    auto map = dynamic_cast<TMXTiledMap*>(this->getChildByName("map"));
-    auto hero = dynamic_cast<Sprite*>(this->getChildByName("hero"));
-
-    if (!map || !hero)
-    {
-        CCLOG("Map or Hero not found.");
-        return;
-    }
-
-    // 获取主角位置
-    auto heroPosition = hero->getPosition();
-
-    // 获取屏幕可视区域大小
-    auto visibleSize = Director::getInstance()->getVisibleSize();
 
     // 获取地图尺寸
     auto mapSize = map->getMapSize();
@@ -92,23 +39,120 @@ void GameScene::update(float delta)
     float mapWidth = mapSize.width * tileSize.width;
     float mapHeight = mapSize.height * tileSize.height;
 
-    // 计算屏幕中心点的偏移量
-    Vec2 screenCenter = Vec2(visibleSize.width / 2, visibleSize.height / 2);
+    // 加载图层
+    blocksLayer = map->getLayer("blocks");
+    itemsLayer = map->getLayer("items");
 
-    // 初始化地图的新位置（以主角居中计算）
-    Vec2 mapPosition = screenCenter - heroPosition;
+    // 创建主角
+    hero = Sprite::create("hero.png");
+    if (!hero)
+    {
+        CCLOG("Failed to load hero.");
+        return false;
+    }
+    // 主角初始位置设置为屏幕中心
+    hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
+    hero->setName("hero"); // 设置名称
+    this->addChild(hero, 1); // 将主角添加到场景，而不是地图
 
-    // 限制地图位置，防止超出边界，避免黑边
-    mapPosition.x = std::min(mapPosition.x, 0.0f); // 地图左边界
-    mapPosition.x = std::max(mapPosition.x, visibleSize.width - mapWidth); // 地图右边界
-    mapPosition.y = std::min(mapPosition.y, 0.0f); // 地图下边界
-    mapPosition.y = std::max(mapPosition.y, visibleSize.height - mapHeight); // 地图上边界
-
-    // 更新地图位置
+    // 初始化地图位置
+    mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
 
-    // 主角始终保持逻辑上的绝对位置（相对于地图）
-    // 不需要单独调整 hero->setPosition，因为其位置用于驱动地图
+    // 添加键盘操作
+    addKeyboardListener(hero);
+
+    this->scheduleUpdate(); // 调度更新方法
+
+    return true;
+}
+
+void GameScene::update(float delta)
+{
+    // 获取地图和主角
+    if (!map || !hero)
+    {
+        CCLOG("Map or Hero not found.");
+        return;
+    }
+
+    // 获取可见尺寸和地图尺寸
+    auto visibleSize = Director::getInstance()->getVisibleSize();
+    auto mapSize = map->getMapSize();
+    auto tileSize = map->getTileSize();
+    float mapWidth = mapSize.width * tileSize.width;
+    float mapHeight = mapSize.height * tileSize.height;
+
+    // 更新跳跃和下落逻辑
+    if (isJumping)
+    {
+        /* // 检查跳跃是否碰到阻挡物
+        //int tileGID = checkBlockCollision(hero->getPositionX(), hero->getPositionY() - currentJumpHeight);
+        if (1) // 如果碰到方块（GID >= 181）//tileGID >= 181
+        {
+            currentJumpHeight = 0.0f; // 停止跳跃
+            jumpVelocity = 0.0f;      // 跳跃速度归零
+            isJumping = false;        // 跳跃状态结束
+        }*/
+
+        /*// 更新跳跃高度
+        currentJumpHeight += jumpVelocity * delta;
+        jumpVelocity += jumpAcceleration * delta;
+
+        // 更新地图位置，根据跳跃和下落调整
+
+        map->setPosition(mapPosition.x, mapPosition.y - currentJumpHeight);
+
+        // 检查跳跃是否结束（速度为 0 时结束跳跃）
+        if (jumpVelocity <= 0.0f)
+        {
+            jumpVelocity = 0.0f;  // 确保速度为 0
+            isJumping = false;    // 跳跃结束
+            currentJumpHeight = 0.0f; // 重置跳跃高度
+        }*/
+        applyJump(delta);
+    }
+    else
+    {
+        // 自由落体
+        applyGravity(delta);
+    }
+
+    
+
+    // 更新地图位置
+    //mapPosition.y = std::max(mapPosition.y - currentJumpHeight, -map->getTileSize().height); // 防止地图位置超出下边界
+    //map->setPosition(mapPosition);
+
+    // 更新左右移动逻辑
+    if (moveLeft)
+    {
+        mapPosition.x += 3; // 向左移动
+        // 限制地图不能超出左边界
+        if (mapPosition.x >= mapWidth / 2 - 10)
+        {
+            mapPosition.x = mapWidth / 2 - 10;
+        }
+        if (checkBlockCollision(hero->getPositionX() + 10, hero->getPositionY()) >= 181)
+        {
+            mapPosition.x = mapPosition.x - 10;
+        }
+    }
+    if (moveRight)
+    {
+        mapPosition.x -= 3; // 向右移动
+        // 限制地图不能超出右边界
+        if (mapPosition.x <= -mapWidth / 2 + 10)
+        {
+            mapPosition.x = -mapWidth / 2 + 10;
+        }
+        if (checkBlockCollision(hero->getPositionX() - 10, hero->getPositionY()) >= 181)
+        {
+            mapPosition.x = mapPosition.x + 10;
+        }
+    }
+
+    map->setPosition(mapPosition);
 }
 
 void GameScene::addKeyboardListener(Sprite* hero)
@@ -116,18 +160,32 @@ void GameScene::addKeyboardListener(Sprite* hero)
     auto keyboardListener = EventListenerKeyboard::create();
 
     keyboardListener->onKeyPressed = [=](EventKeyboard::KeyCode keyCode, Event* event) {
-        Vec2 heroPosition = hero->getPosition();
-
+        // 处理按下按键
         switch (keyCode)
         {
-        case EventKeyboard::KeyCode::KEY_A: // 左移
-            hero->setPosition(heroPosition + Vec2(-10, 0));
+        case EventKeyboard::KeyCode::KEY_A: // 向左移动
+            moveLeft = true;
             break;
-        case EventKeyboard::KeyCode::KEY_D: // 右移
-            hero->setPosition(heroPosition + Vec2(10, 0));
+        case EventKeyboard::KeyCode::KEY_D: // 向右移动
+            moveRight = true;
             break;
         case EventKeyboard::KeyCode::KEY_SPACE: // 跳跃
             performJump(hero);
+            break;
+        default:
+            break;
+        }
+        };
+
+    keyboardListener->onKeyReleased = [=](EventKeyboard::KeyCode keyCode, Event* event) {
+        // 处理松开按键
+        switch (keyCode)
+        {
+        case EventKeyboard::KeyCode::KEY_A: // 停止向左移动
+            moveLeft = false;
+            break;
+        case EventKeyboard::KeyCode::KEY_D: // 停止向右移动
+            moveRight = false;
             break;
         default:
             break;
@@ -139,11 +197,82 @@ void GameScene::addKeyboardListener(Sprite* hero)
 
 void GameScene::performJump(Sprite* hero)
 {
-    // 跳跃动作：上升 30 像素点，然后回到原位
-    auto jumpUp = MoveBy::create(0.2f, Vec2(0, 30));  // 上升
-    auto jumpDown = MoveBy::create(0.2f, Vec2(0, -30)); // 返回
-    auto jumpSequence = Sequence::create(jumpUp, jumpDown, nullptr);
-    hero->runAction(jumpSequence);
+    // 检查角色是否站在地面上，只有站在地面上才能跳跃
+    if (!isJumping)
+    {
+        isJumping = true;               // 设置为跳跃状态
+        jumpVelocity = 100.0f;          // 设置跳跃速度
+        maxJumpHeight = 100.0f;         // 设置最大跳跃高度
+        currentJumpHeight = 0.0f;       // 初始化当前跳跃高度
+    }
+}
+
+void GameScene::applyJump(float delta)
+{
+    currentJumpHeight += jumpVelocity * delta; // 以恒定速度上升
+
+    // 更新 mapPosition.y，保持角色在屏幕中间
+    mapPosition.y -= jumpVelocity * delta;
+
+    // 检查是否达到最大跳跃高度
+    if (currentJumpHeight >= maxJumpHeight)
+    {
+        isJumping = false;  // 停止跳跃，开始自由落体
+        currentJumpHeight = 0.0f;
+    }
+}
+
+void GameScene::applyGravity(float delta)
+{
+    // 检查角色是否在空中下落
+    if (checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) < 181) // 如果下面没有阻挡物
+    {
+        fallSpeed += fallAcceleration * delta; // 下落加速度
+        mapPosition.y -= fallSpeed; // 更新地图位置，角色始终保持在屏幕中间
+        //map->setPosition(mapPosition.x, mapPosition.y);
+        //hero->setPositionY(hero->getPositionY() + fallSpeed); // 更新主角的Y位置
+    }
+    else
+    {   
+        // 如果角色落地了，停止下落
+        fallSpeed = 0.0f;
+    }
+}
+
+int GameScene::checkBlockCollision(float x, float y)
+{
+    // 获取瓦片坐标
+    Vec2 tileCoord = getTileCoordForPosition(x, y);
+
+    // 首先检查 blocksLayer 上的瓦片 GID
+    int blockGID = blocksLayer->getTileGIDAt(tileCoord);
+
+    if (blockGID >= 181) // 如果是方块（GID >= 181）
+    {
+        return blockGID; // 返回方块的 GID，表示碰到障碍物
+    }
+
+    return 0; // 没有碰撞
+}
+
+Vec2 GameScene::getTileCoordForPosition(float x, float y)
+{
+    // 获取地图的Tile大小
+    Size tileSize = map->getTileSize();
+    Vec2 mapOrigin = map->getPosition();
+
+    // 将世界坐标转化为地图坐标
+    float mapX = x - mapOrigin.x;
+    float mapY = y - mapOrigin.y;
+
+    // 计算瓦片坐标
+    int tileX = mapX / tileSize.width;
+    int tileY = (map->getMapSize().height * tileSize.height - mapY) / tileSize.height;
+
+    return Vec2(tileX, tileY);
 }
 
 
+
+
+    
