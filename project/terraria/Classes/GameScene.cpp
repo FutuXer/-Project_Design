@@ -18,11 +18,14 @@ bool GameScene::init()
         return false;
     }
 
+    initWithPhysics();//引入物理组件
+    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); //设置重力
+
     auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
     // 创建地图
-    map = TMXTiledMap::create("testmap.tmx");
+    auto map = TMXTiledMap::create("testmap.tmx");
     if (!map)
     {
         CCLOG("Failed to load map.");
@@ -40,23 +43,45 @@ bool GameScene::init()
     float mapHeight = mapSize.height * tileSize.height;
 
     // 加载图层
-    blocksLayer = map->getLayer("blocks");
-    itemsLayer = map->getLayer("items");
+    auto blocksLayer = map->getLayer("blocks");
+    auto itemsLayer = map->getLayer("items");
+    PhysicsMaterial nonBounce(1, 0, 1); //不会反弹的物理模型
+    for (int x = 0; x < mapSize.width; x++) {
+        for (int y = 0; y < mapSize.height; y++) {
+            // 获取瓦片
+            auto tile = blocksLayer->getTileAt(Vec2(x, y));
+
+            // 如果瓦片存在，则创建刚体
+            if (tile) {
+                // 创建物理刚体
+                auto bodyOfBlocks = PhysicsBody::createBox(tileSize,nonBounce);
+                bodyOfBlocks->setGravityEnable(false);   // 禁用重力影响
+
+                // 将刚体附加到瓦片节点
+                tile->setPhysicsBody(bodyOfBlocks);
+            }
+        }
+    }
+
+    
 
     // 创建主角
-    hero = Sprite::create("hero.png");
+    auto hero = Sprite::create("hero.png");
     if (!hero)
     {
         CCLOG("Failed to load hero.");
         return false;
     }
+    auto bodyOfHero = PhysicsBody::createBox(hero->getContentSize(), nonBounce); //主角的刚体
+    hero->setPhysicsBody(bodyOfHero);
+
     // 主角初始位置设置为屏幕中心
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
     hero->setName("hero"); // 设置名称
     this->addChild(hero, 1); // 将主角添加到场景，而不是地图
 
     // 初始化地图位置
-    mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
+    auto mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
 
     // 添加键盘操作
@@ -115,7 +140,7 @@ void GameScene::update(float delta)
     else
     {
         // 自由落体
-        applyGravity(delta);
+        //applyGravity(delta);
     }
 
     
@@ -133,10 +158,10 @@ void GameScene::update(float delta)
         {
             mapPosition.x = mapWidth / 2 - 10;
         }
-        if (checkBlockCollision(hero->getPositionX() + 10, hero->getPositionY()) >= 181)
+        /*if (checkBlockCollision(hero->getPositionX() + 10, hero->getPositionY()) >= 181)
         {
             mapPosition.x = mapPosition.x - 10;
-        }
+        }*/
     }
     if (moveRight)
     {
@@ -146,10 +171,10 @@ void GameScene::update(float delta)
         {
             mapPosition.x = -mapWidth / 2 + 10;
         }
-        if (checkBlockCollision(hero->getPositionX() - 10, hero->getPositionY()) >= 181)
+        /*if (checkBlockCollision(hero->getPositionX() - 10, hero->getPositionY()) >= 181)
         {
             mapPosition.x = mapPosition.x + 10;
-        }
+        }*/
     }
 
     map->setPosition(mapPosition);
@@ -222,7 +247,7 @@ void GameScene::applyJump(float delta)
     }
 }
 
-void GameScene::applyGravity(float delta)
+/*void GameScene::applyGravity(float delta)
 {
     // 检查角色是否在空中下落
     if (checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) < 181) // 如果下面没有阻挡物
@@ -237,9 +262,9 @@ void GameScene::applyGravity(float delta)
         // 如果角色落地了，停止下落
         fallSpeed = 0.0f;
     }
-}
+}*/
 
-int GameScene::checkBlockCollision(float x, float y)
+/*int GameScene::checkBlockCollision(float x, float y)
 {
     // 获取瓦片坐标
     Vec2 tileCoord = getTileCoordForPosition(x, y);
@@ -253,7 +278,7 @@ int GameScene::checkBlockCollision(float x, float y)
     }
 
     return 0; // 没有碰撞
-}
+}*/
 
 Vec2 GameScene::getTileCoordForPosition(float x, float y)
 {
