@@ -25,7 +25,7 @@ bool GameScene::init()
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
     // 创建地图
-    auto map = TMXTiledMap::create("testmap.tmx");
+    map = TMXTiledMap::create("testmap.tmx");
     if (!map)
     {
         CCLOG("Failed to load map.");
@@ -43,9 +43,10 @@ bool GameScene::init()
     float mapHeight = mapSize.height * tileSize.height;
 
     // 加载图层
-    auto blocksLayer = map->getLayer("blocks");
-    auto itemsLayer = map->getLayer("items");
+    blocksLayer = map->getLayer("blocks");
+    itemsLayer = map->getLayer("items");
     PhysicsMaterial nonBounce(1, 0, 1); //不会反弹的物理模型
+    PhysicsMaterial infinity_mass(1e10, 0, 1); //无穷大质量的物理模型
     for (int x = 0; x < mapSize.width; x++) {
         for (int y = 0; y < mapSize.height; y++) {
             // 获取瓦片
@@ -54,9 +55,8 @@ bool GameScene::init()
             // 如果瓦片存在，则创建刚体
             if (tile) {
                 // 创建物理刚体
-                auto bodyOfBlocks = PhysicsBody::createBox(tileSize,nonBounce);
+                auto bodyOfBlocks = PhysicsBody::createBox(tileSize, infinity_mass);
                 bodyOfBlocks->setGravityEnable(false);   // 禁用重力影响
-
                 // 将刚体附加到瓦片节点
                 tile->setPhysicsBody(bodyOfBlocks);
             }
@@ -66,7 +66,7 @@ bool GameScene::init()
     
 
     // 创建主角
-    auto hero = Sprite::create("hero.png");
+    hero = Sprite::create("hero.png");
     if (!hero)
     {
         CCLOG("Failed to load hero.");
@@ -81,7 +81,7 @@ bool GameScene::init()
     this->addChild(hero, 1); // 将主角添加到场景，而不是地图
 
     // 初始化地图位置
-    auto mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
+    mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
 
     // 添加键盘操作
