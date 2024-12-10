@@ -17,10 +17,11 @@ private:
     void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
     int GameScene::checkBlockCollision(float x, float y);      // 检查与blocksLayer的碰撞
     void applyGravity(float delta);                   // 应用重力
-    void applyJump(float delta);
+    void applyJump(int delta);
     void interactWithItems();                        // 与itemsLayer进行交互
     float getBlockTopY(float heroX, float heroY);
-
+    void updatePhysicsWorld(float delta);
+    void checkAndFixHeroCollision();
 
 
     // 获取瓦片坐标

@@ -4,7 +4,7 @@ USING_NS_CC;
 
 const float gravity = -3.0f; // 重力加速度
 const float maxFallSpeed = -200.0f; // 最大下落速度
-bool overland = 0;
+const float MAX_VELOCITY = 150.0f;  // 最大水平速度
 
 Scene* GameScene::createScene()
 {
@@ -18,8 +18,9 @@ bool GameScene::init()
         return false;
     }
 
-    initWithPhysics();//引入物理组件
-    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); //设置重力
+    initWithPhysics(); // 引入物理组件
+    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); // 设置重力
+    this->getPhysicsWorld()->setAutoStep(false); // 禁用自动步进
 
     auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
@@ -45,8 +46,8 @@ bool GameScene::init()
     // 加载图层
     blocksLayer = map->getLayer("blocks");
     itemsLayer = map->getLayer("items");
-    PhysicsMaterial nonBounce(1, 0, 1); //不会反弹的物理模型
-    PhysicsMaterial infinity_mass(1e10, 0, 1); //无穷大质量的物理模型
+    PhysicsMaterial nonBounce(1, 0, 1); // 不会反弹的物理模型
+    PhysicsMaterial infinity_mass(1e10, 0, 1); // 无穷大质量的物理模型
     for (int x = 0; x < mapSize.width; x++) {
         for (int y = 0; y < mapSize.height; y++) {
             // 获取瓦片
@@ -63,8 +64,6 @@ bool GameScene::init()
         }
     }
 
-
-
     // 创建主角
     hero = Sprite::create("hero.png");
     if (!hero)
@@ -72,9 +71,9 @@ bool GameScene::init()
         CCLOG("Failed to load hero.");
         return false;
     }
-    auto bodyOfHero = PhysicsBody::createBox(hero->getContentSize(), nonBounce); //主角的刚体
-    bodyOfHero->setRotationEnable(false);//锁定主角的旋转
-    bodyOfHero->setMass(1); //设置主角的质量
+    auto bodyOfHero = PhysicsBody::createBox(hero->getContentSize(), nonBounce); // 主角的刚体
+    bodyOfHero->setRotationEnable(false); // 锁定主角的旋转
+    bodyOfHero->setMass(1); // 设置主角的质量
     hero->setPhysicsBody(bodyOfHero);
     // 主角初始位置设置为屏幕中心
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
@@ -85,26 +84,13 @@ bool GameScene::init()
     mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
 
-    //设置下空气墙
-    //auto airWall_down = Node::create();
-    //auto wallBody_down = PhysicsBody::createBox(Size(visibleSize.width, 100), PhysicsMaterial(0.0f, 1.0f, 1.0f));
-    //wallBody_down->setDynamic(false); // 静态物体，不会移动
-    //airWall_down->setPhysicsBody(wallBody_down);
-    //airWall_down->setPosition(Vec2(origin.x + visibleSize.width / 2, -50));
-    //this->addChild(airWall_down);
-
-    //设置上空气墙
-    //auto airWall_up = Node::create();
-    //auto wallBody_up = PhysicsBody::createBox(Size(visibleSize.width, 100), PhysicsMaterial(0.0f, 1.0f, 1.0f));
-    //wallBody_up->setDynamic(false); // 静态物体，不会移动
-    //airWall_up->setPhysicsBody(wallBody_up);
-    //airWall_up->setPosition(Vec2(origin.x + visibleSize.width / 2, visibleSize.height - 10));
-
-    // 添加到场景中
-    //this->addChild(airWall_up);
-
     // 添加键盘操作
     addKeyboardListener(hero);
+
+    // 调度物理更新
+    this->schedule([=](float deltaTime) {
+        this->updatePhysicsWorld(deltaTime);
+        }, "update_physics_world_key");
 
     this->scheduleUpdate(); // 调度更新方法
 
@@ -136,29 +122,54 @@ void GameScene::update(float delta)
     // 更新左右移动逻辑
     if (moveLeft)
     {
-        mapPosition.x += 3; // 向左移动
+        mapPosition.x += 3; // 向左移动      
+        checkAndFixHeroCollision();
         // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 10)
+        if (mapPosition.x >= mapWidth / 2 - 11)
         {
-            mapPosition.x = mapWidth / 2 - 10;
+            mapPosition.x = mapWidth / 2 - 11;
         }
     }
     if (moveRight)
     {
         mapPosition.x -= 3; // 向右移动
         // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 10)
+        if (mapPosition.x <= -mapWidth / 2 + 11)
         {
-            mapPosition.x = -mapWidth / 2 + 10;
+            mapPosition.x = -mapWidth / 2 + 11;
         }
+        checkAndFixHeroCollision();
     }
 
+    // 更新地图位置
     Vec2 tmpPosition = hero->getPosition();
     mapPosition.x = mapPosition.x - (tmpPosition.x - mapWidth / 2);
     mapPosition.y = mapPosition.y - (tmpPosition.y - mapHeight / 2);
     map->setPosition(mapPosition);
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
 }
+
+void GameScene::checkAndFixHeroCollision()
+{
+    // 获取角色当前的物理碰撞体
+    Vec2 heroPos = hero->getPosition();
+
+    // 获取角色当前位置左右的瓦片坐标
+    int tileGID_left = checkBlockCollision(heroPos.x - 10, heroPos.y);
+    int tileGID_right = checkBlockCollision(heroPos.x + 10, heroPos.y);
+
+    // 如果碰到方块，则修正角色位置
+    if (tileGID_left >= 181)
+    {
+        mapPosition.x -= 3;
+    }
+    // 如果碰到方块，则修正角色位置
+    if (tileGID_right >= 181)
+    {
+        mapPosition.x += 3;
+    }
+}
+
 
 void GameScene::addKeyboardListener(Sprite* hero)
 {
@@ -251,7 +262,11 @@ Vec2 GameScene::getTileCoordForPosition(float x, float y)
     return Vec2(tileX, tileY);
 }
 
-
-
-
-    
+void GameScene::updatePhysicsWorld(float delta)
+{
+    // 使用固定时间步长进行物理更新
+    for (int i = 0; i < 3; ++i)
+    {
+        this->getPhysicsWorld()->step(1 / 180.0f);  // 每次物理步进 1/180 秒
+    }
+}
