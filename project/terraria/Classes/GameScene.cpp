@@ -27,6 +27,12 @@ bool GameScene::init()
 
     // 创建地图
     map = TMXTiledMap::create("testmap.tmx");
+    // 获取地图尺寸
+    auto mapSize = map->getMapSize();
+    auto tileSize = map->getTileSize();
+    float mapWidth = mapSize.width * tileSize.width;
+    float mapHeight = mapSize.height * tileSize.height;
+
     if (!map)
     {
         CCLOG("Failed to load map.");
@@ -37,19 +43,16 @@ bool GameScene::init()
     map->setName("map"); // 设置名称
     this->addChild(map, 0);
 
-    // 获取地图尺寸
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
 
     // 加载图层
     blocksLayer = map->getLayer("blocks");
     itemsLayer = map->getLayer("items");
     PhysicsMaterial nonBounce(1, 0, 1); // 不会反弹的物理模型
     PhysicsMaterial infinity_mass(1e10, 0, 1); // 无穷大质量的物理模型
-    for (int x = 0; x < mapSize.width; x++) {
-        for (int y = 0; y < mapSize.height; y++) {
+    for (int x = 0; x < mapSize.width; x++)
+    {
+        for (int y = 0; y < mapSize.height; y++)
+        {
             // 获取瓦片
             auto tile = blocksLayer->getTileAt(Vec2(x, y));
 
@@ -82,6 +85,7 @@ bool GameScene::init()
 
     // 初始化地图位置
     mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
+    
     map->setPosition(mapPosition);
 
     // 添加键盘操作
@@ -125,26 +129,27 @@ void GameScene::update(float delta)
         mapPosition.x += 3; // 向左移动      
         checkAndFixHeroCollision();
         // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 11)
+        if (mapPosition.x >= visibleSize.width / 2 - 11)
         {
-            mapPosition.x = mapWidth / 2 - 11;
+            mapPosition.x = visibleSize.width / 2 - 11;
         }
     }
     if (moveRight)
     {
         mapPosition.x -= 3; // 向右移动
         // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 11)
+        if (mapPosition.x <= visibleSize.width / 2 - mapWidth + 11)
         {
-            mapPosition.x = -mapWidth / 2 + 11;
+            mapPosition.x = visibleSize.width / 2 - mapWidth + 11;
         }
         checkAndFixHeroCollision();
     }
 
     // 更新地图位置
     Vec2 tmpPosition = hero->getPosition();
-    mapPosition.x = mapPosition.x - (tmpPosition.x - mapWidth / 2);
-    mapPosition.y = mapPosition.y - (tmpPosition.y - mapHeight / 2);
+
+    mapPosition.x = mapPosition.x - (tmpPosition.x - visibleSize.width / 2);
+    mapPosition.y = mapPosition.y - (tmpPosition.y - visibleSize.height / 2);
     map->setPosition(mapPosition);
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
 }
@@ -169,7 +174,6 @@ void GameScene::checkAndFixHeroCollision()
         mapPosition.x += 3;
     }
 }
-
 
 void GameScene::addKeyboardListener(Sprite* hero)
 {
