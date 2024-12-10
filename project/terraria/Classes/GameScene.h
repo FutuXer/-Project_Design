@@ -1,60 +1,27 @@
-#pragma once
 #ifndef __GAME_SCENE_H__
 #define __GAME_SCENE_H__
 
 #include "cocos2d.h"
+#include "ui/CocosGUI.h"  // 添加 UI 控件头文件，确保能使用 Slider
 
-class GameScene : public cocos2d::Scene
-{
+class GameScene : public cocos2d::Scene {
 public:
     static cocos2d::Scene* createScene();
     virtual bool init();
-    virtual void update(float delta) override;
     CREATE_FUNC(GameScene);
 
 private:
-    void addKeyboardListener(cocos2d::Sprite* hero); // 添加键盘监听器
-    void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
-    int GameScene::checkBlockCollision(float x, float y);      // 检查与blocksLayer的碰撞
-    void applyGravity(float delta);                   // 应用重力
-    void applyJump(float delta);
-    void interactWithItems();                        // 与itemsLayer进行交互
-    float getBlockTopY(float heroX, float heroY);
+    int audioID = -1;  // 初始化 audioID，防止未定义行为
+    cocos2d::ui::Slider* volumeSlider = nullptr;  // 音量滑动条指针
+    cocos2d::Menu* confirmMenu = nullptr;         // 确定按钮菜单指针
 
-
-
-    // 获取瓦片坐标
-    cocos2d::Vec2 getTileCoordForPosition(float x, float y);
-
-    // 新增成员变量以便保存地图和主角的位置关系
-    cocos2d::TMXTiledMap* map;
-    cocos2d::Sprite* hero;
-
-    // 保存当前地图的位置
-    cocos2d::Vec2 mapPosition;
-
-    // 控制地图移动的变量
-    bool moveLeft = false;
-    bool moveRight = false;
-
-    // 跳跃相关
-    bool isJumping = false;
-    float jumpVelocity = 0.0f;
-    float jumpAcceleration = -200.0f;
-    float maxJumpHeight = 30.0f;
-    float currentJumpHeight = 0.0f;
-
-    // 图层相关
-    cocos2d::TMXLayer* blocksLayer = nullptr; // 不能穿越的阻挡层
-    cocos2d::TMXLayer* itemsLayer = nullptr;  // 可穿越的物品层
-
-    // 
-    float fallSpeed = 0.0f;            // 当前下落速度
-    float fallAcceleration = -3.0f;    // 下落加速度（通常是地球重力加速度）
+    // 函数声明
+    void showSettings(cocos2d::Ref* sender);  // 显示设置菜单
+    void exitGame(cocos2d::Ref* sender);      // 退出到主菜单
+    void createVolumeSlider();                // 创建音量滑动条和确定按钮
+    void removeSettingsMenu();                // 移除设置菜单
+    void createSettingsMenu();                // 创建设置菜单
 };
 
 #endif // __GAME_SCENE_H__
-
-
-
 

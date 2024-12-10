@@ -1,257 +1,200 @@
 #include "GameScene.h"
-
+#include "StartScene.h"
+#include "audio/include/AudioEngine.h"
+#include "ui/CocosGUI.h"
 USING_NS_CC;
+using namespace cocos2d::ui;
 
-const float gravity = -3.0f; // 重力加速度
-const float maxFallSpeed = -200.0f; // 最大下落速度
-bool overland = 0;
-
-Scene* GameScene::createScene()
-{
+Scene* GameScene::createScene() {
     return GameScene::create();
 }
 
-bool GameScene::init()
+bool GameScene::init() 
 {
-    if (!Scene::init())
-    {
+    if (!Scene::init()) 
         return false;
-    }
 
-    initWithPhysics();//引入物理组件
-    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); //设置重力
+    cocos2d::experimental::AudioEngine::stopAll();//先停止所有音乐
 
-    auto visibleSize = Director::getInstance()->getVisibleSize();
-    Vec2 origin = Director::getInstance()->getVisibleOrigin();
-
-    // 创建地图
-    map = TMXTiledMap::create("testmap.tmx");
-    if (!map)
-    {
-        CCLOG("Failed to load map.");
-        return false;
-    }
-    map->setAnchorPoint(Vec2(0, 0));
-    map->setScale(1.0f);
-    map->setName("map"); // 设置名称
-    this->addChild(map, 0);
-
-    // 获取地图尺寸
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
-
-    // 加载图层
-    blocksLayer = map->getLayer("blocks");
-    itemsLayer = map->getLayer("items");
-    PhysicsMaterial nonBounce(1, 0, 1); //不会反弹的物理模型
-    PhysicsMaterial infinity_mass(1e10, 0, 1); //无穷大质量的物理模型
-    for (int x = 0; x < mapSize.width; x++) {
-        for (int y = 0; y < mapSize.height; y++) {
-            // 获取瓦片
-            auto tile = blocksLayer->getTileAt(Vec2(x, y));
-
-            // 如果瓦片存在，则创建刚体
-            if (tile) {
-                // 创建物理刚体
-                auto bodyOfBlocks = PhysicsBody::createBox(tileSize, infinity_mass);
-                bodyOfBlocks->setGravityEnable(false);   // 禁用重力影响
-                // 将刚体附加到瓦片节点
-                tile->setPhysicsBody(bodyOfBlocks);
-            }
-        }
-    }
+    audioID = cocos2d::experimental::AudioEngine::play2d("music.mp3", true);
+    const Size visibleSize = Director::getInstance()->getVisibleSize();
+    const Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
 
-
-    // 创建主角
-    hero = Sprite::create("hero.png");
-    if (!hero)
-    {
-        CCLOG("Failed to load hero.");
-        return false;
-    }
-    auto bodyOfHero = PhysicsBody::createBox(hero->getContentSize(), nonBounce); //主角的刚体
-    bodyOfHero->setRotationEnable(false);//锁定主角的旋转
-    bodyOfHero->setMass(1); //设置主角的质量
-    hero->setPhysicsBody(bodyOfHero);
-    // 主角初始位置设置为屏幕中心
-    hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
-    hero->setName("hero"); // 设置名称
-    this->addChild(hero, 1); // 将主角添加到场景，而不是地图
-
-    // 初始化地图位置
-    mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
-    map->setPosition(mapPosition);
-
-    //设置下空气墙
-    //auto airWall_down = Node::create();
-    //auto wallBody_down = PhysicsBody::createBox(Size(visibleSize.width, 100), PhysicsMaterial(0.0f, 1.0f, 1.0f));
-    //wallBody_down->setDynamic(false); // 静态物体，不会移动
-    //airWall_down->setPhysicsBody(wallBody_down);
-    //airWall_down->setPosition(Vec2(origin.x + visibleSize.width / 2, -50));
-    //this->addChild(airWall_down);
-
-    //设置上空气墙
-    //auto airWall_up = Node::create();
-    //auto wallBody_up = PhysicsBody::createBox(Size(visibleSize.width, 100), PhysicsMaterial(0.0f, 1.0f, 1.0f));
-    //wallBody_up->setDynamic(false); // 静态物体，不会移动
-    //airWall_up->setPhysicsBody(wallBody_up);
-    //airWall_up->setPosition(Vec2(origin.x + visibleSize.width / 2, visibleSize.height - 10));
-
-    // 添加到场景中
-    //this->addChild(airWall_up);
-
-    // 添加键盘操作
-    addKeyboardListener(hero);
-
-    this->scheduleUpdate(); // 调度更新方法
-
+    this->createSettingsMenu();//右上角显示设置按钮
     return true;
 }
 
-void GameScene::update(float delta)
+void GameScene::showSettings(cocos2d::Ref* sender) {
+    // 移除“设置”按钮所在的菜单
+    this->removeChildByName("settingsMenu");
+
+    // 获取窗口大小
+    const Size visibleSize = Director::getInstance()->getVisibleSize();
+    const Vec2 origin = Director::getInstance()->getVisibleOrigin();
+
+    // 初始按钮位置
+    float initialY = visibleSize.height - 50 + origin.y;
+
+    // 创建“回到主菜单”按钮
+    auto backLabel = Label::createWithTTF(u8"回到主菜单", "../Resources/fonts/jiantisongti.ttf", 32);
+    auto backButton = MenuItemLabel::create(backLabel, CC_CALLBACK_1(GameScene::exitGame, this));
+    backButton->setPosition(Vec2(visibleSize.width - 100 + origin.x, initialY));
+
+    // 创建按钮1
+    auto button1Label = Label::createWithTTF(u8"调节音量", "../Resources/fonts/jiantisongti.ttf", 32);
+    auto button1 = MenuItemLabel::create(button1Label, [=](Ref* sender) {
+        // 点击按钮1时调用 createVolumeSlider 函数
+        createVolumeSlider();  // 调用显示进度条的函数
+        });
+    button1->setPosition(Vec2(visibleSize.width - 100 + origin.x, initialY - 50));
+    button1->setName("volumn button");  // 给按钮1设置名字
+
+    // 创建按钮2
+    auto button2Label = Label::createWithTTF(u8"按钮2", "../Resources/fonts/jiantisongti.ttf", 32);
+    auto button2 = MenuItemLabel::create(button2Label, [](Ref* sender) { CCLOG("按钮2被点击!"); });
+    button2->setPosition(Vec2(visibleSize.width - 100 + origin.x, initialY - 100));
+    button2->setName("button2");  // 给按钮2设置名字
+
+    // 创建按钮3
+    auto button3Label = Label::createWithTTF(u8"按钮3", "../Resources/fonts/jiantisongti.ttf", 32);
+    auto button3 = MenuItemLabel::create(button3Label, [](Ref* sender) { CCLOG("按钮3被点击!"); });
+    button3->setPosition(Vec2(visibleSize.width - 100 + origin.x, initialY - 150));
+    button3->setName("button3");  // 给按钮3设置名字
+
+    // 创建返回按钮
+    auto button4Label = Label::createWithTTF(u8"返回", "../Resources/fonts/jiantisongti.ttf", 32);
+    auto button4 = MenuItemLabel::create(button4Label, [this](Ref* sender) {
+        CCLOG("返回按钮被点击!");
+        this->removeSettingsMenu();  // 调用移除函数
+        this->createSettingsMenu();
+        });
+    button4->setPosition(Vec2(visibleSize.width - 100 + origin.x, initialY - 200));
+
+
+    // 创建菜单并添加按钮
+    auto backMenu = Menu::create(backButton, button1, button2, button3, button4, nullptr);
+    backMenu->setPosition(Vec2::ZERO); // 将菜单的原点设置为(0, 0)
+    this->addChild(backMenu, 1,"fourbuttonmenu");  // 添加菜单到场景中
+}
+
+
+void GameScene::exitGame(cocos2d::Ref* sender)
 {
-    // 获取地图和主角
-    if (!map || !hero)
+    // 确保退出前移除滑动条和“确定”按钮
+    if (volumeSlider != nullptr)
     {
-        CCLOG("Map or Hero not found.");
-        return;
+        this->removeChild(volumeSlider);
+        volumeSlider = nullptr;
     }
 
-    // 获取可见尺寸和地图尺寸
-    auto visibleSize = Director::getInstance()->getVisibleSize();
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
-
-    // 更新跳跃和下落逻辑
-    if (isJumping)
+    if (confirmMenu != nullptr)
     {
-        applyJump(delta);
+        this->removeChild(confirmMenu);
+        confirmMenu = nullptr;
     }
 
-    // 更新左右移动逻辑
-    if (moveLeft)
+    // 切换到 StartScene
+    auto startScene = StartScene::createScene();
+    Director::getInstance()->replaceScene(TransitionFade::create(0.5, startScene));
+}
+
+
+
+void GameScene::createVolumeSlider()
+{
+    // 如果之前存在滑动条和菜单，先移除它们
+    if (volumeSlider && volumeSlider->getParent() == this)
     {
-        mapPosition.x += 3; // 向左移动
-        // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 10)
-        {
-            mapPosition.x = mapWidth / 2 - 10;
+        this->removeChild(volumeSlider);
+        volumeSlider = nullptr;
+    }
+
+    if (confirmMenu && confirmMenu->getParent() == this)
+    {
+        this->removeChild(confirmMenu);
+        confirmMenu = nullptr;
+    }
+
+    // 获取窗口大小
+    const Size visibleSize = Director::getInstance()->getVisibleSize();
+    const Vec2 origin = Director::getInstance()->getVisibleOrigin();
+
+    // 创建音量控制Slider
+    volumeSlider = ui::Slider::create();
+    volumeSlider->loadBarTexture("slider_track.png");
+    volumeSlider->loadSlidBallTextures("slider_thumb.png", "slider_thumb.png", "slider_thumb.png");
+    volumeSlider->setPosition(Vec2(visibleSize.width / 2 + origin.x-50, visibleSize.height - 150 + origin.y));
+
+    // 获取当前音量并设置滑动条百分比
+    float initialVolume = cocos2d::experimental::AudioEngine::getVolume(audioID);
+    volumeSlider->setPercent(initialVolume * 100);
+
+    // 添加滑动事件监听
+    volumeSlider->addEventListener([&](Ref* sender, ui::Slider::EventType type) {
+        if (type == ui::Slider::EventType::ON_PERCENTAGE_CHANGED) {
+            int percent = volumeSlider->getPercent();
+            float volume = percent / 100.0f;
+            if (cocos2d::experimental::AudioEngine::getState(audioID) == cocos2d::experimental::AudioEngine::AudioState::PLAYING) {
+                cocos2d::experimental::AudioEngine::setVolume(audioID, volume);
+            }
+            else {
+                CCLOG("Audio is not playing, cannot set volume");
+            }
+
         }
-    }
-    if (moveRight)
-    {
-        mapPosition.x -= 3; // 向右移动
-        // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 10)
-        {
-            mapPosition.x = -mapWidth / 2 + 10;
+        });
+
+    this->addChild(volumeSlider, 1);
+
+    // 创建“确定”按钮
+    auto confirmLabel = Label::createWithTTF(u8"确定", "../Resources/fonts/jiantisongti.ttf", 28);
+    auto confirmButton = MenuItemLabel::create(confirmLabel, [=](Ref* sender) {
+        if (volumeSlider && volumeSlider->getParent() == this) {
+            this->removeChild(volumeSlider);
+            volumeSlider = nullptr;
         }
-    }
 
-    Vec2 tmpPosition = hero->getPosition();
-    mapPosition.x = mapPosition.x - (tmpPosition.x - mapWidth / 2);
-    mapPosition.y = mapPosition.y - (tmpPosition.y - mapHeight / 2);
-    map->setPosition(mapPosition);
-    hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
-}
-
-void GameScene::addKeyboardListener(Sprite* hero)
-{
-    auto keyboardListener = EventListenerKeyboard::create();
-
-    keyboardListener->onKeyPressed = [=](EventKeyboard::KeyCode keyCode, Event* event) {
-        // 处理按下按键
-        switch (keyCode)
-        {
-        case EventKeyboard::KeyCode::KEY_A: // 向左移动
-            moveLeft = true;
-            break;
-        case EventKeyboard::KeyCode::KEY_D: // 向右移动
-            moveRight = true;
-            break;
-        case EventKeyboard::KeyCode::KEY_SPACE: // 跳跃
-            performJump(hero);
-            break;
-        default:
-            break;
+        if (confirmMenu && confirmMenu->getParent() == this) {
+            this->removeChild(confirmMenu);
+            confirmMenu = nullptr;
         }
-        };
+        });
 
-    keyboardListener->onKeyReleased = [=](EventKeyboard::KeyCode keyCode, Event* event) {
-        // 处理松开按键
-        switch (keyCode)
-        {
-        case EventKeyboard::KeyCode::KEY_A: // 停止向左移动
-            moveLeft = false;
-            break;
-        case EventKeyboard::KeyCode::KEY_D: // 停止向右移动
-            moveRight = false;
-            break;
-        default:
-            break;
-        }
-        };
+    confirmButton->setPosition(Vec2(visibleSize.width / 2 + origin.x-50, visibleSize.height - 200 + origin.y));
 
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(keyboardListener, this);
+    // 创建菜单并添加“确定”按钮
+    confirmMenu = Menu::create(confirmButton, nullptr);
+    confirmMenu->setPosition(Vec2::ZERO);
+    this->addChild(confirmMenu, 1);
 }
 
-void GameScene::performJump(Sprite* hero)
+//把设置界面（4个按钮）移除
+void GameScene::removeSettingsMenu()
 {
-    // 检查角色是否站在地面上，只有站在地面上才能跳跃
-    if (!isJumping && checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) >= 181)
-    {
-        isJumping = true;               // 设置为跳跃状态
-        jumpVelocity = 100.0f;          // 设置跳跃速度
-        maxJumpHeight = 100.0f;         // 设置最大跳跃高度
-        currentJumpHeight = 0.0f;       // 初始化当前跳跃高度
-    }
+    // 根据名称移除菜单
+    this->removeChildByName("fourbuttonmenu");
 }
-
-void GameScene::applyJump(int delta)
+//生成设置按钮）
+void GameScene::createSettingsMenu()
 {
-    hero->getPhysicsBody()->applyImpulse(Vec2(0, 500));
-    isJumping = false;  // 停止跳跃，开始自由落体
+    // 获取窗口大小
+    const Size visibleSize = Director::getInstance()->getVisibleSize();
+    const Vec2 origin = Director::getInstance()->getVisibleOrigin();
+
+    // 创建“设置”按钮标签
+    auto settingsLabel = Label::createWithTTF(u8"设置", "../Resources/fonts/jiantisongti.ttf", 48);
+
+    // 创建“设置”按钮，点击时调用 showSettings
+    auto settingsButton = MenuItemLabel::create(
+        settingsLabel,
+        CC_CALLBACK_1(GameScene::showSettings, this));
+
+    settingsButton->setPosition(Vec2(visibleSize.width - 100 + origin.x, visibleSize.height - 50 + origin.y));
+    auto menu = Menu::create(settingsButton, nullptr);
+    menu->setPosition(Vec2::ZERO);
+
+    // 将菜单添加到场景中，设置名称为 "settingsMenu"
+    this->addChild(menu, 1, "settingsMenu");
 }
 
-int GameScene::checkBlockCollision(float x, float y)
-{
-    // 获取瓦片坐标
-    Vec2 tileCoord = getTileCoordForPosition(x, y);
-
-    // 首先检查 blocksLayer 上的瓦片 GID
-    int blockGID = blocksLayer->getTileGIDAt(tileCoord);
-
-    if (blockGID >= 181) // 如果是方块（GID >= 181）
-    {
-        return blockGID; // 返回方块的 GID，表示碰到障碍物
-    }
-
-    return 0; // 没有碰撞
-}
-
-Vec2 GameScene::getTileCoordForPosition(float x, float y)
-{
-    // 获取地图的Tile大小
-    Size tileSize = map->getTileSize();
-    Vec2 mapOrigin = map->getPosition();
-
-    // 将世界坐标转化为地图坐标
-    float mapX = x - mapOrigin.x;
-    float mapY = y - mapOrigin.y;
-
-    // 计算瓦片坐标
-    int tileX = mapX / tileSize.width;
-    int tileY = (map->getMapSize().height * tileSize.height - mapY) / tileSize.height;
-
-    return Vec2(tileX, tileY);
-}
-
-
-
-
-    
