@@ -1,5 +1,5 @@
-#include "Item_menu.cpp"
 #include "GameScene.h"
+#include <chrono>
 
 USING_NS_CC;
 
@@ -87,6 +87,7 @@ bool GameScene::init()
 
     // 添加键盘操作
     addKeyboardListener(hero);
+    addTouchListener();
 
     // 调度物理更新
     this->schedule([=](float deltaTime) {
@@ -94,9 +95,8 @@ bool GameScene::init()
         }, "update_physics_world_key");
 
     this->scheduleUpdate(); // 调度更新方法
-
-    this->checkPocket();    // 显示口袋物品
-    this->checkBag();       // 显示背包物品                       
+    this->checkPocket();    // 显示口袋物品（并更换手中的物品）
+    this->checkBag();       // 显示物品栏（即背包，并整理背包物品）
 
     return true;
 }
@@ -123,33 +123,34 @@ void GameScene::update(float delta)
         applyJump(delta);
     }
 
+    checkAndFixHeroCollision();
+
     // 更新左右移动逻辑
     if (moveLeft)
     {
         mapPosition.x += 3; // 向左移动      
-        checkAndFixHeroCollision();
+        //checkAndFixHeroCollision();
         // 限制地图不能超出左边界
-        if (mapPosition.x >= visibleSize.width / 2 - 11)
+        if (mapPosition.x >= mapWidth / 2 - 11)
         {
-            mapPosition.x = visibleSize.width / 2 - 11;
+            mapPosition.x = mapWidth / 2 - 11;
         }
     }
     if (moveRight)
     {
         mapPosition.x -= 3; // 向右移动
         // 限制地图不能超出右边界
-        if (mapPosition.x <= visibleSize.width / 2 - mapWidth + 11)
+        if (mapPosition.x <= -mapWidth / 2 + 11)
         {
-            mapPosition.x = visibleSize.width / 2 - mapWidth + 11;
+            mapPosition.x = -mapWidth / 2 + 11;
         }
-        checkAndFixHeroCollision();
+        //checkAndFixHeroCollision();
     }
 
     // 更新地图位置
     Vec2 tmpPosition = hero->getPosition();
-
-    mapPosition.x = mapPosition.x - (tmpPosition.x - visibleSize.width / 2);
-    mapPosition.y = mapPosition.y - (tmpPosition.y - visibleSize.height / 2);
+    mapPosition.x = mapPosition.x - (tmpPosition.x - mapWidth / 2);
+    mapPosition.y = mapPosition.y - (tmpPosition.y - mapHeight / 2);
     map->setPosition(mapPosition);
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
 }
@@ -166,12 +167,12 @@ void GameScene::checkAndFixHeroCollision()
     // 如果碰到方块，则修正角色位置
     if (tileGID_left >= 181)
     {
-        mapPosition.x -= 3;
+        mapPosition.x -= 5;
     }
     // 如果碰到方块，则修正角色位置
     if (tileGID_right >= 181)
     {
-        mapPosition.x += 3;
+        mapPosition.x += 5;
     }
 }
 
@@ -240,7 +241,7 @@ void GameScene::performJump(Sprite* hero)
 
 void GameScene::applyJump(int delta)
 {
-    hero->getPhysicsBody()->applyImpulse(Vec2(0, 500));
+    hero->getPhysicsBody()->applyImpulse(Vec2(0, 300));
     isJumping = false;  // 停止跳跃，开始自由落体
 }
 
@@ -283,5 +284,103 @@ void GameScene::updatePhysicsWorld(float delta)
     for (int i = 0; i < 3; ++i)
     {
         this->getPhysicsWorld()->step(1 / 180.0f);  // 每次物理步进 1/180 秒
+    }
+}
+
+
+void GameScene::addTouchListener()
+{
+    auto listener = EventListenerTouchOneByOne::create();
+    listener->setSwallowTouches(true);
+
+    listener->onTouchBegan = [this](Touch* touch, Event* event) {
+        touchStartFrame = Director::getInstance()->getTotalFrames();  // 获取触摸开始的帧数
+        touchStartPosition = touch->getLocation();
+        return true;
+        };
+
+    listener->onTouchEnded = [this](Touch* touch, Event* event) {
+        touchEndFrame = Director::getInstance()->getTotalFrames();  // 获取触摸结束的帧数
+        float duration = (touchEndFrame - touchStartFrame) * Director::getInstance()->getAnimationInterval();  // 计算持续时间
+        Vec2 touchEndPosition = touch->getLocation();
+
+        float validRange = 100.0f;  // 有效范围，单位：像素
+        float distanceToHero = touchEndPosition.distance(hero->getPosition());
+
+        // 如果长按时间超过阈值并且在有效范围内，删除泥块
+        if (duration >= longPressThreshold && distanceToHero <= validRange)
+        {
+            removeBlockAtPosition(touchEndPosition);
+        }
+        else if (duration < longPressThreshold && distanceToHero <= validRange)
+        {
+            addBlockAtPosition(touchEndPosition);
+        }
+        };
+
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+}
+
+// 获取当前时间（秒）
+float GameScene::getCurrentTime()
+{
+    // 获取当前时间戳，返回秒数
+    return std::chrono::duration<float>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+
+void GameScene::addBlockAtPosition(cocos2d::Vec2 position)
+{
+    // 定义人物周围的有效点击区域
+    float validRange = 100.0f;  // 有效区域半径，可根据需要调整
+    cocos2d::Vec2 heroPosition = hero->getPosition();
+
+    // 检查点击位置是否在有效范围内
+    if (position.distance(heroPosition) > validRange)
+    {
+        CCLOG("Invalid click. Click is outside the valid range.");
+        return;
+    }
+
+    // 将点击位置转换为瓦片坐标
+    cocos2d::Vec2 tileCoord = getTileCoordForPosition(position.x, position.y);
+
+    // 检查该位置是否已有瓦片
+    if (blocksLayer && blocksLayer->getTileGIDAt(tileCoord) != 0)
+    {
+        CCLOG("Tile already exists at (%f, %f).", tileCoord.x, tileCoord.y);
+        return;
+    }
+
+    // 设置一个土块的 GID（假设土块的 GID 为 182，根据你的 TMX 文件来修改）
+    int dirtBlockGID = 182;
+    blocksLayer->setTileGID(dirtBlockGID, tileCoord);
+
+    // 获取新生成的瓦片
+    auto newTile = blocksLayer->getTileAt(tileCoord);
+    if (newTile)
+    {
+        // 给新瓦片添加物理刚体
+        cocos2d::PhysicsMaterial infinity_mass(1e10, 0, 1); // 无穷大质量的物理模型
+        auto bodyOfBlock = cocos2d::PhysicsBody::createBox(map->getTileSize(), infinity_mass);
+        bodyOfBlock->setGravityEnable(false); // 禁用重力影响
+        newTile->setPhysicsBody(bodyOfBlock);
+    }
+
+    CCLOG("Block added at (%f, %f).", tileCoord.x, tileCoord.y);
+}
+
+// 删除泥块的函数
+void GameScene::removeBlockAtPosition(Vec2 position)
+{
+    Vec2 tileCoord = getTileCoordForPosition(position.x, position.y);
+    if (blocksLayer->getTileGIDAt(tileCoord) != 0)
+    {
+        blocksLayer->removeTileAt(tileCoord);
+        CCLOG("Block removed at tile (%f, %f).", tileCoord.x, tileCoord.y);
+    }
+    else
+    {
+        CCLOG("No block to remove at (%f, %f).", tileCoord.x, tileCoord.y);
     }
 }

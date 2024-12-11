@@ -13,6 +13,7 @@ public:
     CREATE_FUNC(GameScene);
 
 private:
+    void addTouchListener();                         // 读入鼠标点击
     void addKeyboardListener(cocos2d::Sprite* hero); // 添加键盘监听器
     void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
     int GameScene::checkBlockCollision(float x, float y);      // 检查与blocksLayer的碰撞
@@ -22,10 +23,14 @@ private:
     float getBlockTopY(float heroX, float heroY);
     void updatePhysicsWorld(float delta);
     void checkAndFixHeroCollision();
+    void addBlockAtPosition(cocos2d::Vec2 position);
+    void removeBlockAtPosition(cocos2d::Vec2 position); // 删除泥块的函数
+    float getCurrentTime();                             // 获取当前时间的函数声明
 
     void checkPocket();                                                         // 检查口袋(只显示前10个常用物品，用于更换手里拿的物品)
     void checkBag();                                                            // 检查背包(显示所有随身物品、制造和装备，用于更换口袋中的物品和整理背包、整理口袋)
     void onItemMenuClicked(Ref* sender, int itemIndex);                         // 选择物品
+    void ClickToChangePosition(Ref* sender, int itemIndex);                     // 更换物品在背包中的位置
     void ItemsInHand(int itemTag);                                              // 手中的物品
 
     // 获取瓦片坐标
@@ -61,6 +66,12 @@ private:
     // 
     float fallSpeed = 0.0f;            // 当前下落速度
     float fallAcceleration = -3.0f;    // 下落加速度（通常是地球重力加速度）
+
+    // 长按相关变量
+    int touchStartFrame;
+    int touchEndFrame;
+    cocos2d::Vec2 touchStartPosition;
+    float longPressThreshold = 0.5f; // 长按时间阈值（秒）
 };
 
 #endif // __GAME_SCENE_H__
