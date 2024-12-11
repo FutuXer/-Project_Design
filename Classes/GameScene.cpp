@@ -89,6 +89,11 @@ bool GameScene::init()
     addKeyboardListener(hero);
     addTouchListener();
 
+    // 初始化鼠标监听器
+    auto mouseListener = EventListenerMouse::create();
+    mouseListener->onMouseMove = CC_CALLBACK_1(GameScene::onMouseMove, this);
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(mouseListener, this);
+
     // 调度物理更新
     this->schedule([=](float deltaTime) {
         this->updatePhysicsWorld(deltaTime);
@@ -129,28 +134,29 @@ void GameScene::update(float delta)
     if (moveLeft)
     {
         mapPosition.x += 3; // 向左移动      
-        //checkAndFixHeroCollision();
+        checkAndFixHeroCollision();
         // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 11)
+        if (mapPosition.x >= visibleSize.width / 2 - 11)
         {
-            mapPosition.x = mapWidth / 2 - 11;
+            mapPosition.x = visibleSize.width / 2 - 11;
         }
     }
     if (moveRight)
     {
         mapPosition.x -= 3; // 向右移动
         // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 11)
+        if (mapPosition.x <= visibleSize.width / 2 - mapWidth + 11)
         {
-            mapPosition.x = -mapWidth / 2 + 11;
+            mapPosition.x = visibleSize.width / 2 - mapWidth + 11;
         }
-        //checkAndFixHeroCollision();
+        checkAndFixHeroCollision();
     }
 
     // 更新地图位置
     Vec2 tmpPosition = hero->getPosition();
-    mapPosition.x = mapPosition.x - (tmpPosition.x - mapWidth / 2);
-    mapPosition.y = mapPosition.y - (tmpPosition.y - mapHeight / 2);
+
+    mapPosition.x = mapPosition.x - (tmpPosition.x - visibleSize.width / 2);
+    mapPosition.y = mapPosition.y - (tmpPosition.y - visibleSize.height / 2);
     map->setPosition(mapPosition);
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
 }
@@ -167,12 +173,12 @@ void GameScene::checkAndFixHeroCollision()
     // 如果碰到方块，则修正角色位置
     if (tileGID_left >= 181)
     {
-        mapPosition.x -= 5;
+        mapPosition.x -= 3;
     }
     // 如果碰到方块，则修正角色位置
     if (tileGID_right >= 181)
     {
-        mapPosition.x += 5;
+        mapPosition.x += 3;
     }
 }
 
@@ -196,6 +202,8 @@ void GameScene::addKeyboardListener(Sprite* hero)
             break;
         case EventKeyboard::KeyCode::KEY_ESCAPE: // 切换背包/口袋
             if (bagLayer->isVisible()) {
+                itemInMove->setVisible(false);
+                ClickToChangePosition(nullptr, -1);
                 bagLayer->setVisible(false);
                 pocketLayer->setVisible(true);
             }

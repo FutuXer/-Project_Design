@@ -1,11 +1,9 @@
 #include "GameScene.h"
-#include <vector>
+#include "ui/CocosGUI.h"
 
 USING_NS_CC;
-using namespace std;
+using namespace ui;
 
-
-// 显示口袋中的物品（游戏自始至终都会显示），并更换手中的物品
 void GameScene::checkPocket() {
     pocketLayer = Layer::create();  // 创建口袋图层
     this->addChild(pocketLayer);
@@ -24,53 +22,27 @@ void GameScene::checkPocket() {
     // 物品菜单的横向间距
     float padding = 10 * scaleX;
 
-    vector<string> itemImages = {
-        "bronzen_pickaxe.png",  // 初始物品1：铜镐
-        "bronzen_axe.png",      // 初始物品2：铜斧
-        "bronzen_hammer.png",   // 初始物品3：铜锤
-        "bronzen_sword.png",    // 初始物品4：铜剑
-    };
-
-    while (itemImages.size() < 10) {
-        itemImages.push_back("item0.png");  // 当口袋中的物品少于10个时
+    while (itemImages.size() < 8) {
+        itemImages.push_back("item0.png");  // 当口袋中的物品少于8个时
     }
 
-    // 创建菜单
-    Vector<MenuItem*> menuItems;
-
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 8; ++i) {
         // 创建灰色半透明的框
         auto box = LayerColor::create(Color4B(128, 128, 128, 128), boxSize.width, boxSize.height);
         box->setOpacity(50);
         box->setPosition(Vec2(i * (boxSize.width + padding), 0));
-        pocketLayer->addChild(box, 1, "box" + to_string(i));  // 给每个框一个唯一的名字标签
+        pocketLayer->addChild(box, 1, i);  // 给每个框一个唯一的tag
 
-        // 创建MenuItem
-        auto menuItem = MenuItemImage::create(
-            itemImages[i],  // 正常状态下的图片
-            itemImages[i],  // 选中状态下的图片
-            [this, i](Ref* sender) {
+        // 创建Button
+        auto button = Button::create(itemImages[i]);
+        button->setScale(scaleY);
+        button->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
+        button->addTouchEventListener([this, i](Ref* sender, Widget::TouchEventType type) {
+            if (type == Widget::TouchEventType::ENDED) {
                 this->onItemMenuClicked(sender, i);
             }
-        );
-        menuItem->setScale(scaleY);
-        menuItem->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
-        menuItems.pushBack(menuItem);
-
-        // 这里不再将 MenuItem 直接添加到 box 中
-    }
-
-    // 创建菜单，并添加所有 MenuItem
-    auto menu = Menu::createWithArray(menuItems);
-    menu->setPosition(Vec2::ZERO);
-    pocketLayer->addChild(menu);
-
-    // 将每个 MenuItem 的父节点设置为对应的 box
-    for (int i = 0; i < 10; ++i) {
-        auto box = pocketLayer->getChildByName("box" + to_string(i));
-        if (box) {
-            menuItems.at(i)->setPosition(box->getPosition() + Vec2(boxSize.width / 2, boxSize.height / 2));
-        }
+            });
+        box->addChild(button);
     }
 }
 
@@ -81,7 +53,7 @@ void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
     static int currentItem = -1;
     if (currentItem != -1) {
         // 将之前选中的框恢复为灰色
-        auto previousBox = dynamic_cast<LayerColor*>(pocketLayer->getChildByName("box" + std::to_string(currentItem)));
+        auto previousBox = dynamic_cast<LayerColor*>(pocketLayer->getChildByTag(currentItem));
         if (previousBox) {
             previousBox->setColor(Color3B(128, 128, 128));
         }
@@ -91,7 +63,7 @@ void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
     currentItem = itemIndex;
 
     // 将选中的框变成黄色
-    auto selectedBox = dynamic_cast<LayerColor*>(pocketLayer->getChildByName("box" + std::to_string(itemIndex)));
+    auto selectedBox = dynamic_cast<LayerColor*>(pocketLayer->getChildByTag(itemIndex));
     if (selectedBox) {
         selectedBox->setColor(Color3B(255, 255, 0));
     }
@@ -101,10 +73,9 @@ void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
 
 void GameScene::ItemsInHand(int itemTag) {
     // 根据itemTag实现拿起不同物品的逻辑
-    //auto itemInHand = Sprite::create("")
+    // auto itemInHand = Sprite::create("");
 }
 
-// 检查背包（按下Esc键后显示，初始状态暂时不显示），并整理背包
 void GameScene::checkBag() {
     bagLayer = Layer::create();
     this->addChild(bagLayer);
@@ -126,59 +97,138 @@ void GameScene::checkBag() {
     float paddingX = 8 * scaleX;
     float paddingY = 8 * scaleY;
 
-    vector<string> itemImages = {
-        "bronzen_pickaxe.png",  // 初始物品1：铜镐
-        "bronzen_axe.png",      // 初始物品2：铜斧
-        "bronzen_hammer.png",   // 初始物品3：铜锤
-        "bronzen_sword.png",    // 初始物品4：铜剑
-    };
-
-    while (itemImages.size() < 50) {
-        itemImages.push_back("item0.png");  // 当背包袋中的物品少于50个时
+    while (itemImages.size() < 32) {
+        itemImages.push_back("item0.png");  // 当背包袋中的物品少于32个时
     }
 
-    // 创建菜单
-    Vector<MenuItem*> menuItems;
-
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 32; ++i) {
         // 创建灰色半透明的框
         auto box = LayerColor::create(Color4B(128, 128, 128, 128), boxSize.width, boxSize.height);
         box->setOpacity(50);
-        box->setPosition(Vec2((i % 10) * (boxSize.width + paddingX), -(i / 10) * (boxSize.height + paddingY)));
-        bagLayer->addChild(box, 1, "box" + to_string(i));  // 给每个框一个唯一的名字标签
+        box->setPosition(Vec2((i % 8) * (boxSize.width + paddingX), -(i / 8) * (boxSize.height + paddingY)));
+        bagLayer->addChild(box, 1, i);  // 给每个框一个唯一的tag
 
-        // 创建MenuItem
-        auto menuItem = MenuItemImage::create(
-            itemImages[i],  // 正常状态下的图片
-            "item0.png",  // 选中状态下的图片
-           [this, i](Ref* sender) {
-                this->ClickToChangePosition(sender, i);        // 选取之后更换位置
+        // 创建Button
+        auto button = Button::create(itemImages[i]);
+        button->setScale(scaleY);
+        button->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
+        button->addTouchEventListener([this, i](Ref* sender, Widget::TouchEventType type) {
+            if (type == Widget::TouchEventType::ENDED) {
+                this->ClickToChangePosition(sender, i);  // 选取之后更换位置
             }
-        );
-        menuItem->setScale(scaleY);
-        menuItem->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
-        menuItems.pushBack(menuItem);
+            });
+        box->addChild(button);
     }
 
-    // 创建菜单，并添加所有 MenuItem
-    auto menu = Menu::createWithArray(menuItems);
-    menu->setPosition(Vec2::ZERO);
-    bagLayer->addChild(menu);
-
-    // 将每个 MenuItem 的父节点设置为对应的 box
-    for (int i = 0; i < 50; ++i) {
-        auto box = bagLayer->getChildByName("box" + to_string(i));
-        if (box) {
-            menuItems.at(i)->setPosition(box->getPosition() + Vec2(boxSize.width / 2, boxSize.height / 2));
-        }
-    }
-
-    bagLayer->setVisible(false);    // 初始化状态下设置为不可见
+    bagLayer->setVisible(false);  // 初始化状态下设置为不可见
 }
 
 void GameScene::ClickToChangePosition(Ref* sender, int itemIndex) {
     CCLOG("Item %d menu item clicked", itemIndex);
 
-    // 创建鼠标事件监听器
-    auto mouseListener = EventListenerMouse::create();
+    static string itemNameInHand = "item0.png";  // 此时手中的物品
+
+    // 只用按esc切回pocket界面时才会调用，防止背包中因为整理而丢失物品
+    if (sender == nullptr && itemIndex == -1) {
+        itemInMove = nullptr;                  // 恢复鼠标样式
+        if (itemNameInHand == "item0.png")
+            return;                              // 手中已经空了
+        for (int i = 0; i < itemImages.size(); ++i) {
+            if (itemImages[i] == "item0.png") {
+                itemImages[i] = itemNameInHand;
+                // 更新按钮图片
+                auto box = bagLayer->getChildByTag(i);
+                if (box) {
+                    auto button = dynamic_cast<Button*>(box->getChildren().at(0));
+                    if (button) {
+                        button->loadTextureNormal(itemImages[i]);
+                        button->loadTexturePressed(itemImages[i]);
+                    }
+                }
+                // 如果在第一行，也同步更新口袋
+                if (i < 8) {
+                    auto box = pocketLayer->getChildByTag(i);
+                    if (box) {
+                        auto button = dynamic_cast<Button*>(box->getChildren().at(0));
+                        if (button) {
+                            button->loadTextureNormal(itemImages[i]);
+                            button->loadTexturePressed(itemImages[i]);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        itemNameInHand = "item0.png";            // 当玩家关闭背包时，确保手中一定是空的
+        return;
+    }
+
+    // 重新安排物品的位置
+    if (itemIndex >= 0 && itemIndex < itemImages.size()) {
+        // 将正在移动中的物品显示在鼠标的位置
+        if (itemNameInHand != "item0.png") {
+            // 初始化鼠标监听器
+            auto mouseListener = EventListenerMouse::create();
+            EventMouse* e = (EventMouse*)mouseListener;
+            Vec2 mousePosition = e->getLocation();
+
+            auto itemInMove = Sprite::create(itemNameInHand);
+            if (itemInMove) {
+                itemInMove->setPosition(mousePosition);
+            }
+            this->addChild(itemInMove, 1);
+        }
+
+        // 实质上是交换图片
+        string temp = itemImages[itemIndex];
+        itemImages[itemIndex] = itemNameInHand;
+        itemNameInHand = temp;
+
+        // 更新按钮图片
+        auto box = bagLayer->getChildByTag(itemIndex);
+        if (box) {
+            auto button = dynamic_cast<Button*>(box->getChildren().at(0));
+            if (button) {
+                button->loadTextureNormal(itemImages[itemIndex]);
+                button->loadTexturePressed(itemImages[itemIndex]);
+            }
+        }
+        // 如果改动了第一行的图标，同步修改口袋中的物品
+        if (itemIndex < 8) {
+            auto box = pocketLayer->getChildByTag(itemIndex);
+            if (box) {
+                auto button = dynamic_cast<Button*>(box->getChildren().at(0));
+                if (button) {
+                    button->loadTextureNormal(itemImages[itemIndex]);
+                    button->loadTexturePressed(itemImages[itemIndex]);
+                }
+            }
+        }
+
+        // 创建或更新正在移动中的物品精灵
+        if (itemInMove == nullptr) {
+            itemInMove = Sprite::create(itemNameInHand);
+            this->addChild(itemInMove, 1);
+        }
+        else {
+            itemInMove->setTexture(itemNameInHand);
+        }
+    }
+}
+
+// 鼠标移动回调函数
+void GameScene::onMouseMove(Event* event) {
+    EventMouse* e = static_cast<EventMouse*>(event);
+    Vec2 mousePosition = e->getLocationInView();
+    mousePosition = Director::getInstance()->convertToGL(mousePosition);
+    mousePosition.y = Director::getInstance()->getVisibleSize().height - mousePosition.y; // 转换坐标 
+
+    // 打印鼠标位置
+    CCLOG("Mouse Position: x = %f, y = %f", mousePosition.x, mousePosition.y);
+
+    // 让物品精灵跟随鼠标位置
+    if (itemInMove) {
+        itemInMove->setPosition(mousePosition);
+    }
 }

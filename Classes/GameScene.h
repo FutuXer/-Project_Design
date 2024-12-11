@@ -3,6 +3,8 @@
 #define __GAME_SCENE_H__
 
 #include "cocos2d.h"
+#include <iostream>
+using namespace std;
 
 class GameScene : public cocos2d::Scene
 {
@@ -13,6 +15,7 @@ public:
     CREATE_FUNC(GameScene);
 
 private:
+    void onMouseMove(cocos2d::Event* event);
     void addTouchListener();                         // 读入鼠标点击
     void addKeyboardListener(cocos2d::Sprite* hero); // 添加键盘监听器
     void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
@@ -27,11 +30,19 @@ private:
     void removeBlockAtPosition(cocos2d::Vec2 position); // 删除泥块的函数
     float getCurrentTime();                             // 获取当前时间的函数声明
 
+    // 存放所有物品的字符串数组
+    vector<string> itemImages = {
+        "bronzen_pickaxe.png",  // 初始物品1：铜镐
+        "bronzen_axe.png",      // 初始物品2：铜斧
+        "bronzen_hammer.png",   // 初始物品3：铜锤
+        "bronzen_sword.png",    // 初始物品4：铜剑
+    };
     void checkPocket();                                                         // 检查口袋(只显示前10个常用物品，用于更换手里拿的物品)
     void checkBag();                                                            // 检查背包(显示所有随身物品、制造和装备，用于更换口袋中的物品和整理背包、整理口袋)
     void onItemMenuClicked(Ref* sender, int itemIndex);                         // 选择物品
     void ClickToChangePosition(Ref* sender, int itemIndex);                     // 更换物品在背包中的位置
     void ItemsInHand(int itemTag);                                              // 手中的物品
+    cocos2d::Sprite* itemInMove = nullptr;                                      // 正在背包中移动的物品精灵
 
     // 获取瓦片坐标
     cocos2d::Vec2 getTileCoordForPosition(float x, float y);
