@@ -23,6 +23,9 @@ private:
     void updatePhysicsWorld(float delta);
     void checkAndFixHeroCollision();
 
+    //动画相关
+    void setHeroAnimation(const std::string& frame2, const std::string& frame3, const std::string& frame4, const std::string& frame5);
+
 
     // 获取瓦片坐标
     cocos2d::Vec2 getTileCoordForPosition(float x, float y);
