@@ -1,10 +1,11 @@
+#include "Item_menu.cpp"
 #include "GameScene.h"
 
 USING_NS_CC;
 
 const float gravity = -3.0f; // 重力加速度
 const float maxFallSpeed = -200.0f; // 最大下落速度
-bool overland = 0;
+const float MAX_VELOCITY = 150.0f;  // 最大水平速度
 
 Scene* GameScene::createScene()
 {
@@ -17,6 +18,10 @@ bool GameScene::init()
     {
         return false;
     }
+
+    initWithPhysics(); // 引入物理组件
+    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); // 设置重力
+    this->getPhysicsWorld()->setAutoStep(false); // 禁用自动步进
 
     auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
@@ -42,6 +47,23 @@ bool GameScene::init()
     // 加载图层
     blocksLayer = map->getLayer("blocks");
     itemsLayer = map->getLayer("items");
+    PhysicsMaterial nonBounce(1, 0, 1); // 不会反弹的物理模型
+    PhysicsMaterial infinity_mass(1e10, 0, 1); // 无穷大质量的物理模型
+    for (int x = 0; x < mapSize.width; x++) {
+        for (int y = 0; y < mapSize.height; y++) {
+            // 获取瓦片
+            auto tile = blocksLayer->getTileAt(Vec2(x, y));
+
+            // 如果瓦片存在，则创建刚体
+            if (tile) {
+                // 创建物理刚体
+                auto bodyOfBlocks = PhysicsBody::createBox(tileSize, infinity_mass);
+                bodyOfBlocks->setGravityEnable(false);   // 禁用重力影响
+                // 将刚体附加到瓦片节点
+                tile->setPhysicsBody(bodyOfBlocks);
+            }
+        }
+    }
 
     // 创建主角
     hero = Sprite::create("hero.png");
@@ -50,6 +72,10 @@ bool GameScene::init()
         CCLOG("Failed to load hero.");
         return false;
     }
+    auto bodyOfHero = PhysicsBody::createBox(hero->getContentSize(), nonBounce); // 主角的刚体
+    bodyOfHero->setRotationEnable(false); // 锁定主角的旋转
+    bodyOfHero->setMass(1); // 设置主角的质量
+    hero->setPhysicsBody(bodyOfHero);
     // 主角初始位置设置为屏幕中心
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
     hero->setName("hero"); // 设置名称
@@ -62,7 +88,15 @@ bool GameScene::init()
     // 添加键盘操作
     addKeyboardListener(hero);
 
+    // 调度物理更新
+    this->schedule([=](float deltaTime) {
+        this->updatePhysicsWorld(deltaTime);
+        }, "update_physics_world_key");
+
     this->scheduleUpdate(); // 调度更新方法
+
+    this->checkPocket();    // 显示口袋物品
+    this->checkBag();       // 显示背包物品                       
 
     return true;
 }
@@ -86,74 +120,61 @@ void GameScene::update(float delta)
     // 更新跳跃和下落逻辑
     if (isJumping)
     {
-        /* // 检查跳跃是否碰到阻挡物
-        //int tileGID = checkBlockCollision(hero->getPositionX(), hero->getPositionY() - currentJumpHeight);
-        if (1) // 如果碰到方块（GID >= 181）//tileGID >= 181
-        {
-            currentJumpHeight = 0.0f; // 停止跳跃
-            jumpVelocity = 0.0f;      // 跳跃速度归零
-            isJumping = false;        // 跳跃状态结束
-        }*/
-
-        /*// 更新跳跃高度
-        currentJumpHeight += jumpVelocity * delta;
-        jumpVelocity += jumpAcceleration * delta;
-
-        // 更新地图位置，根据跳跃和下落调整
-
-        map->setPosition(mapPosition.x, mapPosition.y - currentJumpHeight);
-
-        // 检查跳跃是否结束（速度为 0 时结束跳跃）
-        if (jumpVelocity <= 0.0f)
-        {
-            jumpVelocity = 0.0f;  // 确保速度为 0
-            isJumping = false;    // 跳跃结束
-            currentJumpHeight = 0.0f; // 重置跳跃高度
-        }*/
         applyJump(delta);
     }
-    else
-    {
-        // 自由落体
-        applyGravity(delta);
-    }
-
-    
-
-    // 更新地图位置
-    //mapPosition.y = std::max(mapPosition.y - currentJumpHeight, -map->getTileSize().height); // 防止地图位置超出下边界
-    //map->setPosition(mapPosition);
 
     // 更新左右移动逻辑
     if (moveLeft)
     {
-        mapPosition.x += 3; // 向左移动
+        mapPosition.x += 3; // 向左移动      
+        checkAndFixHeroCollision();
         // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 10)
+        if (mapPosition.x >= visibleSize.width / 2 - 11)
         {
-            mapPosition.x = mapWidth / 2 - 10;
-        }
-        if (checkBlockCollision(hero->getPositionX() + 10, hero->getPositionY()) >= 181)
-        {
-            mapPosition.x = mapPosition.x - 10;
+            mapPosition.x = visibleSize.width / 2 - 11;
         }
     }
     if (moveRight)
     {
         mapPosition.x -= 3; // 向右移动
         // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 10)
+        if (mapPosition.x <= visibleSize.width / 2 - mapWidth + 11)
         {
-            mapPosition.x = -mapWidth / 2 + 10;
+            mapPosition.x = visibleSize.width / 2 - mapWidth + 11;
         }
-        if (checkBlockCollision(hero->getPositionX() - 10, hero->getPositionY()) >= 181)
-        {
-            mapPosition.x = mapPosition.x + 10;
-        }
+        checkAndFixHeroCollision();
     }
 
+    // 更新地图位置
+    Vec2 tmpPosition = hero->getPosition();
+
+    mapPosition.x = mapPosition.x - (tmpPosition.x - visibleSize.width / 2);
+    mapPosition.y = mapPosition.y - (tmpPosition.y - visibleSize.height / 2);
     map->setPosition(mapPosition);
+    hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
 }
+
+void GameScene::checkAndFixHeroCollision()
+{
+    // 获取角色当前的物理碰撞体
+    Vec2 heroPos = hero->getPosition();
+
+    // 获取角色当前位置左右的瓦片坐标
+    int tileGID_left = checkBlockCollision(heroPos.x - 10, heroPos.y);
+    int tileGID_right = checkBlockCollision(heroPos.x + 10, heroPos.y);
+
+    // 如果碰到方块，则修正角色位置
+    if (tileGID_left >= 181)
+    {
+        mapPosition.x -= 3;
+    }
+    // 如果碰到方块，则修正角色位置
+    if (tileGID_right >= 181)
+    {
+        mapPosition.x += 3;
+    }
+}
+
 
 void GameScene::addKeyboardListener(Sprite* hero)
 {
@@ -171,6 +192,16 @@ void GameScene::addKeyboardListener(Sprite* hero)
             break;
         case EventKeyboard::KeyCode::KEY_SPACE: // 跳跃
             performJump(hero);
+            break;
+        case EventKeyboard::KeyCode::KEY_ESCAPE: // 切换背包/口袋
+            if (bagLayer->isVisible()) {
+                bagLayer->setVisible(false);
+                pocketLayer->setVisible(true);
+            }
+            else {
+                pocketLayer->setVisible(false);
+                bagLayer->setVisible(true);
+            }
             break;
         default:
             break;
@@ -198,7 +229,7 @@ void GameScene::addKeyboardListener(Sprite* hero)
 void GameScene::performJump(Sprite* hero)
 {
     // 检查角色是否站在地面上，只有站在地面上才能跳跃
-    if (!isJumping)
+    if (!isJumping && checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) >= 181)
     {
         isJumping = true;               // 设置为跳跃状态
         jumpVelocity = 100.0f;          // 设置跳跃速度
@@ -207,36 +238,10 @@ void GameScene::performJump(Sprite* hero)
     }
 }
 
-void GameScene::applyJump(float delta)
+void GameScene::applyJump(int delta)
 {
-    currentJumpHeight += jumpVelocity * delta; // 以恒定速度上升
-
-    // 更新 mapPosition.y，保持角色在屏幕中间
-    mapPosition.y -= jumpVelocity * delta;
-
-    // 检查是否达到最大跳跃高度
-    if (currentJumpHeight >= maxJumpHeight)
-    {
-        isJumping = false;  // 停止跳跃，开始自由落体
-        currentJumpHeight = 0.0f;
-    }
-}
-
-void GameScene::applyGravity(float delta)
-{
-    // 检查角色是否在空中下落
-    if (checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) < 181) // 如果下面没有阻挡物
-    {
-        fallSpeed += fallAcceleration * delta; // 下落加速度
-        mapPosition.y -= fallSpeed; // 更新地图位置，角色始终保持在屏幕中间
-        //map->setPosition(mapPosition.x, mapPosition.y);
-        //hero->setPositionY(hero->getPositionY() + fallSpeed); // 更新主角的Y位置
-    }
-    else
-    {   
-        // 如果角色落地了，停止下落
-        fallSpeed = 0.0f;
-    }
+    hero->getPhysicsBody()->applyImpulse(Vec2(0, 500));
+    isJumping = false;  // 停止跳跃，开始自由落体
 }
 
 int GameScene::checkBlockCollision(float x, float y)
@@ -272,7 +277,11 @@ Vec2 GameScene::getTileCoordForPosition(float x, float y)
     return Vec2(tileX, tileY);
 }
 
-
-
-
-    
+void GameScene::updatePhysicsWorld(float delta)
+{
+    // 使用固定时间步长进行物理更新
+    for (int i = 0; i < 3; ++i)
+    {
+        this->getPhysicsWorld()->step(1 / 180.0f);  // 每次物理步进 1/180 秒
+    }
+}

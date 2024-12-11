@@ -17,11 +17,16 @@ private:
     void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
     int GameScene::checkBlockCollision(float x, float y);      // 检查与blocksLayer的碰撞
     void applyGravity(float delta);                   // 应用重力
-    void applyJump(float delta);
+    void applyJump(int delta);
     void interactWithItems();                        // 与itemsLayer进行交互
     float getBlockTopY(float heroX, float heroY);
+    void updatePhysicsWorld(float delta);
+    void checkAndFixHeroCollision();
 
-
+    void checkPocket();                                                         // 检查口袋(只显示前10个常用物品，用于更换手里拿的物品)
+    void checkBag();                                                            // 检查背包(显示所有随身物品、制造和装备，用于更换口袋中的物品和整理背包、整理口袋)
+    void onItemMenuClicked(Ref* sender, int itemIndex);                         // 选择物品
+    void ItemsInHand(int itemTag);                                              // 手中的物品
 
     // 获取瓦片坐标
     cocos2d::Vec2 getTileCoordForPosition(float x, float y);
@@ -32,6 +37,11 @@ private:
 
     // 保存当前地图的位置
     cocos2d::Vec2 mapPosition;
+
+    // 口袋图层
+    cocos2d::Layer* pocketLayer = nullptr;
+    // 背包图层
+    cocos2d::Layer* bagLayer = nullptr;
 
     // 控制地图移动的变量
     bool moveLeft = false;
@@ -54,7 +64,3 @@ private:
 };
 
 #endif // __GAME_SCENE_H__
-
-
-
-
