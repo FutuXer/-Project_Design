@@ -24,6 +24,7 @@
 
 #include "HelloWorldScene.h"
 #include "SimpleAudioEngine.h"
+#include"monster.h"
 
 USING_NS_CC;
 
@@ -32,38 +33,36 @@ Scene* HelloWorld::createScene()
     return HelloWorld::create();
 }
 
+void HelloWorld::MonsterFunc(float dt) {
+    // 获取屏幕大小
+    Size visibleSize = Director::getInstance()->getVisibleSize();
+    Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
-void HelloWorld::silme_move(float dt) {
-    Vec2 Pos;
-    Pos = silme->getPosition();
-    // 创建果冻效果动画
-    auto scaleDown = ScaleTo::create(0.2f, 1.2f, 0.8f);  // 压缩
-    auto scaleUp = ScaleTo::create(0.2f, 0.8f, 1.2f); // 拉伸
-    auto restore = ScaleTo::create(0.2f, 1.0f, 1.0f);  // 恢复  
-    auto jumpR = CallFunc::create([this]() {
-        this->silme_jump('R'); // 向右跳
-        });
-    auto jumpL = CallFunc::create([this]() {
-        this->silme_jump('L'); // 向左跳
-        });
-    // 动画序列
-    auto jellyEffectR = Sequence::create(scaleDown, scaleUp, jumpR, restore, nullptr);
-    auto jellyEffectL = Sequence::create(scaleDown, scaleUp, jumpL, restore, nullptr);
-    if (Pos.x < visibleSize.width / 2) {
-        silme->setFlippedX(false); // 恢复正常
-        silme->runAction(jellyEffectR);
+    if (numberOfMonsters < 6) {
+        // 随机生成怪物的坐标
+        float x_S = origin.x + RandomHelper::random_real(0.0f, visibleSize.width); //史莱姆的坐标
+        float x_Z = origin.x + RandomHelper::random_real(0.0f, visibleSize.width); //僵尸的坐标
+        int choice = RandomHelper::random_int(0, 1); //选择生成史莱姆还是僵尸
+        if (choice == 0) {
+            auto silme = Silme::create("slime.png", 100);
+            silme->setPosition(Vec2(x_S, silme->getContentSize().height / 2));
+            silme->addPhy();
+            silme->addjellyeffect();
+            silme->addhealthbar();
+            this->addChild(silme);
+            silme->schedule(CC_SCHEDULE_SELECTOR(Silme::silme_move), 3);
+        }
+        if (choice == 1) {
+            auto zombie = Zombie::create("zombie1.png", 100);
+            zombie->setPosition(Vec2(x_Z, zombie->getContentSize().height / 2));
+            zombie->addPhy();
+            zombie->addAnimate();
+            zombie->addhealthbar();
+            this->addChild(zombie);
+            zombie->schedule(CC_SCHEDULE_SELECTOR(Zombie::zombie_move));
+        }
+        numberOfMonsters++;
     }
-    else {
-        silme->setFlippedX(true);  // 左右翻转
-        silme->runAction(jellyEffectL);
-    }
-}
-
-void HelloWorld::silme_jump(char direction) {
-    if (direction == 'R')
-        silme->getPhysicsBody()->applyImpulse(Vec2(200, 500)); // 向右跳
-    if (direction == 'L')
-        silme->getPhysicsBody()->applyImpulse(Vec2(-200, 500)); // 向左跳
 }
 
 // Print useful error message instead of segfaulting when files are not there.
@@ -86,7 +85,7 @@ bool HelloWorld::init()
     initWithPhysics();
     this->getPhysicsWorld()->setGravity(Vec2(0, -980));
 
-    visibleSize = Director::getInstance()->getVisibleSize();
+    auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
     /////////////////////////////
@@ -102,41 +101,41 @@ bool HelloWorld::init()
     // add a label shows "Hello World"
     // create and initialize a label
 
-    silme = Sprite::create("slime2r.png");
-    silme->setPosition(Vec2(silme->getContentSize().width / 2, silme->getContentSize().height / 2));
-    auto silmebody = PhysicsBody::createBox(Size(silme->getContentSize()), PhysicsMaterial(1, 0, 1));
-    silmebody->setMass(1);
-    silme->setPhysicsBody(silmebody);
-    this->addChild(silme);
-    auto scaleDown = ScaleTo::create(0.05f, 1.05f, 0.95f);  // 压缩
-    auto scaleUp = ScaleTo::create(0.05f, 0.95f, 1.05f); // 拉伸
-    auto restore = ScaleTo::create(0.05f, 1.0f, 1.0f);  // 恢复  
-    auto jellyEffect = Sequence::create(scaleDown, scaleUp, restore, nullptr);
-    silme->runAction(RepeatForever::create(jellyEffect));
-    schedule(CC_SCHEDULE_SELECTOR(HelloWorld::silme_move, this), 3);
-    
-    //PhysicsMaterial nonBounce(1, 0, 1);
-    //auto body = PhysicsBody::createBox(sprite->getContentSize(), nonBounce);
-    //body->setDynamic(true); // 允许物体受力影响
-    //sprite->setPhysicsBody(body);
+    this->schedule(CC_SCHEDULE_SELECTOR(HelloWorld::MonsterFunc), 10.0f);
 
-   
-    auto airWall = Node::create();
+    auto airWall1 = Node::create();
 
     // 设置空气墙的大小
-    auto wallBody = PhysicsBody::createBox(Size(visibleSize.width, 1), PhysicsMaterial(0.0f, 1.0f, 1.0f));
+    auto wallBody1 = PhysicsBody::createBox(Size(visibleSize.width, 1), PhysicsMaterial(0.0f, 1.0f, 1.0f));
 
     // 配置空气墙属性
-    wallBody->setDynamic(false); // 静态物体，不会移动
+    wallBody1->setDynamic(false); // 静态物体，不会移动
 
     // 将物理体附加到空气墙节点
-    airWall->setPhysicsBody(wallBody);
+    airWall1->setPhysicsBody(wallBody1);
 
     // 设置空气墙位置（例如屏幕中心）
-    airWall->setPosition(Vec2(origin.x + visibleSize.width / 2, -0.5));
+    airWall1->setPosition(Vec2(origin.x + visibleSize.width / 2, -0.5));
 
     // 添加到场景中
-    this->addChild(airWall);
+    this->addChild(airWall1);
+
+   // auto airWall2 = Node::create();
+
+    // 设置空气墙的大小
+    //auto wallBody2 = PhysicsBody::createBox(Size(visibleSize.width, 1), PhysicsMaterial(0.0f, 1.0f, 1.0f));
+
+    // 配置空气墙属性
+    //wallBody2->setDynamic(false); // 静态物体，不会移动
+
+    // 将物理体附加到空气墙节点
+    //airWall2->setPhysicsBody(wallBody2);
+
+    // 设置空气墙位置（例如屏幕中心）
+    //airWall2->setPosition(Vec2(origin.x + visibleSize.width / 2, origin.y + visibleSize.height / 2));
+
+    // 添加到场景中
+    //this->addChild(airWall2);
     return true;
 }
 
