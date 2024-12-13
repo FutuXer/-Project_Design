@@ -5,6 +5,15 @@
  </tileset>
  <tileset firstgid="181" name="tileset" tilewidth="16" tileheight="16" tilecount="264" columns="24">
   <image source="Full Tileset.png" width="384" height="176"/>
+  <tile id="212">
+   <animation>
+    <frame tileid="212" duration="100"/>
+    <frame tileid="213" duration="100"/>
+    <frame tileid="214" duration="100"/>
+    <frame tileid="215" duration="100"/>
+    <frame tileid="236" duration="100"/>
+   </animation>
+  </tile>
  </tileset>
  <layer id="1" name="background" width="30" height="20">
   <data encoding="base64" compression="zlib">
@@ -18,7 +27,7 @@
  </layer>
  <layer id="3" name="items" width="30" height="20">
   <data encoding="base64" compression="zlib">
-   eJxjYBgFo2AUjIJRMAqwAzVGBgZ1Rvrbawe0034A7A0D2hlOwN5jQHycyvbmAe3MJ2DvPSC+T2V7RwHtAADN/QWn
+   eJxjYBgFo2AUjIJRMFRAJyP5ervI0KsG1KNOgZ0gQI6b7YB67Cm0lxwQBrQznIC9x4D4OJXtzQPamU/A3ntAfJ/K9o4C2gEAQIwHRg==
   </data>
  </layer>
 </map>
