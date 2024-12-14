@@ -2,11 +2,12 @@
 #include"hero.h"
 #define BlocksFirstGID_ 10409
 using namespace cocos2d;
-extern Vec2 mapPosition;
-extern TMXTiledMap* map;
 extern TMXLayer* blocksLayer;
 int checkBlockCollision(float x, float y);
 Vec2 getTileCoordForPosition(float x, float y);
+extern float mapWidth;
+extern float mapHeight;
+
 
 void Hero::addPhy() {
     PhysicsMaterial nonBounce(1, 0, 1); // 不会反弹的物理模型
@@ -63,14 +64,14 @@ void Hero::addKeyboardListener() {
 }
 void Hero::applyJump()
 {
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapHeight = mapSize.height * tileSize.height;
+    //auto mapSize = map->getMapSize();
+    //auto tileSize = map->getTileSize();
+    //float mapHeight = mapSize.height * tileSize.height;
     /*在人物超出上边界时，不跳*/
-    if (mapPosition.y >= -mapHeight / 2 + this->getContentSize().height)
-    {
+    //if (mapPosition.y >= -mapHeight / 2 + this->getContentSize().height)
+    //{
         this->getPhysicsBody()->applyImpulse(Vec2(0, JumpHeight));
-    }
+    //}
     isJumping = false;  // 停止跳跃，开始自由落体
 }
 void Hero::setHeroAnimation(const std::string& frame2, const std::string& frame3, const std::string& frame4, const std::string& frame5)
@@ -92,7 +93,7 @@ void Hero::setHeroAnimation(const std::string& frame2, const std::string& frame3
 void Hero::performJump()
 {
     // 检查角色是否站在地面上，只有站在地面上才能跳跃
-    if (!isJumping && checkBlockCollision(this->getPositionX(), this->getPositionY() - 15) >= BlocksFirstGID_)
+    //if (!isJumping && checkBlockCollision(this->getPositionX(), this->getPositionY() - 15) >= BlocksFirstGID_)
     {
         isJumping = true;               // 设置为跳跃状态
     }
@@ -100,52 +101,48 @@ void Hero::performJump()
 
 void Hero::HeroFunc(float delta)
 {
-    // 获取可见尺寸和地图尺寸
+    // 获取可见尺寸和英雄的位置和英雄的大小
     auto visibleSize = Director::getInstance()->getVisibleSize();
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
-
+    Vec2 Pos = this->getPosition();
+    Size HeroSize = this->getContentSize();
+    
     // 更新跳跃和下落逻辑
     if (isJumping)
     {
         applyJump();
     }
 
-    checkAndFixHeroCollision();
-
+    checkAndFixHeroCollision(delta);
+    
+    auto moveR = MoveBy::create(delta, Vec2(3, 0));
+    auto moveL = MoveBy::create(delta, Vec2(-3, 0));
     // 更新左右移动逻辑
-    if (moveLeft)
+    if (moveLeft && Pos.x > (visibleSize.width - mapWidth) / 2 + HeroSize.width )
     {
-        mapPosition.x += 3; // 向左移动      
-        // 限制地图不能超出左边界
-        if (mapPosition.x >= visibleSize.width / 2 - 12)
-        {
-            mapPosition.x = visibleSize.width / 2 - 12;
-        }
+        this->runAction(moveL);
     }
-    if (moveRight)
+    if (moveRight && Pos.x < (visibleSize.width + mapWidth) / 2 - HeroSize.width )
     {
-        mapPosition.x -= 3; // 向右移动
-        // 限制地图不能超出右边界
-        if (mapPosition.x <= visibleSize.width / 2 - mapWidth + 12)
-        {
-            mapPosition.x = visibleSize.width / 2 - mapWidth + 12;
-        }
+        this->runAction(moveR);
     }
 
-    /*阻止人物超出上边界*/
-    if (mapPosition.y < -mapHeight / 2 + this->getContentSize().height)
-        this->getPhysicsBody()->setVelocity(Vec2(0, -70));
+    if (Pos.x < (visibleSize.width - mapWidth) / 2 + HeroSize.width) {
+        auto move = MoveBy::create(delta, Vec2(1, 0));
+        this->runAction(move);
+    }
+
+    if (Pos.x > (visibleSize.width + mapWidth) / 2 - HeroSize.width) {
+        auto move = MoveBy::create(delta, Vec2(-1, 0));
+        this->runAction(move);
+    }
 
     // 更新地图位置
-    Vec2 tmpPosition = this->getPosition();
+   /*Vec2 tmpPosition = this->getPosition();
 
     mapPosition.x = mapPosition.x - (tmpPosition.x - visibleSize.width / 2);
     mapPosition.y = mapPosition.y - (tmpPosition.y - visibleSize.height / 2);
     map->setPosition(mapPosition);
-    this->setPosition(visibleSize.width / 2, visibleSize.height / 2);
+    this->setPosition(visibleSize.width / 2, visibleSize.height / 2);*/
 
     /*// 更新可见范围的瓦片
     RenderManager* renderManager = new RenderManager(map);
@@ -153,10 +150,13 @@ void Hero::HeroFunc(float delta)
     delete renderManager;*/
 
 }
-void Hero::checkAndFixHeroCollision()
+void Hero::checkAndFixHeroCollision(float delta)
 {
     // 获取角色当前的物理碰撞体
     Vec2 heroPos = this->getPosition();
+
+    auto moveR = MoveBy::create(delta, Vec2(3, 0));
+    auto moveL = MoveBy::create(delta, Vec2(-3, 0));
 
     // 获取角色当前位置左右的瓦片坐标
     int tileGID_left1 = checkBlockCollision(heroPos.x - 8, heroPos.y - 7);
@@ -167,11 +167,11 @@ void Hero::checkAndFixHeroCollision()
     // 如果碰到方块，则修正角色位置
     if (tileGID_left1 >= BlocksFirstGID_ || tileGID_left2 >= BlocksFirstGID_)
     {
-        mapPosition.x -= 3;
+        this->runAction(moveR);
     }
     // 如果碰到方块，则修正角色位置
     if (tileGID_right1 >= BlocksFirstGID_ || tileGID_right2 >= BlocksFirstGID_)
     {
-        mapPosition.x += 3;
+        this->runAction(moveL);
     }
 }

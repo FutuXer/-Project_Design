@@ -19,7 +19,9 @@ private:
     float getBlockTopY(float heroX, float heroY);
     void updatePhysicsWorld(float delta);
 
+    //void addPhysicsBodiesForVisibleTiles();
 
+    void updateCameraPosition(cocos2d::Sprite* player);
 
     // 新增成员变量以便保存地图和主角的位置关系
     Hero* hero;

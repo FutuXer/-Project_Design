@@ -27,5 +27,5 @@ public:
     void performJump();  
     void HeroFunc(float delta);
     void setHeroAnimation(const std::string& frame2, const std::string& frame3, const std::string& frame4, const std::string& frame5);
-    void checkAndFixHeroCollision();
+    void checkAndFixHeroCollision(float delta);
 };
