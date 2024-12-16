@@ -107,7 +107,7 @@ bool GameScene::init()
     pocketItems.pushBack(poccketItem2);
 
     auto item3 = MyItem::create("10.png", 30);
-    items.pushBack(item3);  // 物品3：土块（30个）
+    items.pushBack(item3);  // 物品3：铜矿（30个）
     auto poccketItem3 = MyItem::create("10.png",30);
     pocketItems.pushBack(poccketItem3);
 
@@ -115,6 +115,16 @@ bool GameScene::init()
     items.pushBack(item4);  // 物品4：木材（48个）
     auto poccketItem4 = MyItem::create("12.png",48);
     pocketItems.pushBack(poccketItem4);
+
+    auto item5 = MyItem::create("13.png", 48);
+    items.pushBack(item5);  // 物品5：铜矿（48个）
+    auto poccketItem5 = MyItem::create("13.png", 48);
+    pocketItems.pushBack(poccketItem5);
+
+    auto item6 = MyItem::create("14.png", 48);
+    items.pushBack(item6);  // 物品6：铁矿（48个）
+    auto poccketItem6 = MyItem::create("14.png", 48);
+    pocketItems.pushBack(poccketItem6);
 
     while (items.size() < 32) {
         auto emptyItem = MyItem::create("0.png");
@@ -126,10 +136,12 @@ bool GameScene::init()
         pocketItems.pushBack(pocketEmptyItem);  // 当背包袋中的物品少于8个时
     }
     movingItem = MyItem::create("0.png");
-    movingItem->retain();
+    movingItem->retain();                       // 初始化正在移动的物品
+    this->calculate();                          // 初始化可以合成的物品
 
     this->checkPocket();    // 显示口袋物品（并更换手中的物品）
     this->checkBag();       // 显示物品栏（即背包，并整理背包物品）
+    this->checkProduction();// 显示制作窗口
 
     // 添加鼠标事件监听
     auto mouseListener = EventListenerMouse::create();

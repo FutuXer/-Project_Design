@@ -52,9 +52,21 @@ void MyItem::setItemName(const std::string& name) {
 }
 
 void MyItem::setNum(int num) {
+    if (itemNumLabel)
+        itemNumLabel->removeFromParent();          //  清除之前的数字标记
+
     this->num = num;
-    if (itemNumLabel) {
-        itemNumLabel->setString(std::to_string(num));  // 更新标签显示的数量
+    if (this->num > 1) {
+        itemNumLabel = Label::createWithSystemFont(std::to_string(num), "Arial", 12);
+        itemNumLabel->setPosition(Vec2(itemSprite->getContentSize().width / 2, itemSprite->getContentSize().height / 2));
+        this->addChild(itemNumLabel);
+    }                                              // 使得Label显现
+
+    // 此物品已经被消耗完了
+    if (this->num == 0) {
+        if (itemSprite)
+            itemSprite->removeFromParent();        // 删去精灵
+        this->init("0.png", 1);
     }
 }
 
