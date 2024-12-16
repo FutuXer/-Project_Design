@@ -89,19 +89,57 @@ bool GameScene::init()
     addKeyboardListener(hero);
     addTouchListener();
 
-    // 初始化鼠标监听器
-    auto mouseListener = EventListenerMouse::create();
-    mouseListener->onMouseMove = CC_CALLBACK_1(GameScene::onMouseMove, this);
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(mouseListener, this);
-
     // 调度物理更新
     this->schedule([=](float deltaTime) {
         this->updatePhysicsWorld(deltaTime);
         }, "update_physics_world_key");
-
     this->scheduleUpdate(); // 调度更新方法
+
+    /*以下都是初始化物品栏的部分*/
+    auto item1 = MyItem::create("20.png");
+    items.pushBack(item1);  // 物品1：铜镐
+    auto poccketItem1 = MyItem::create("20.png");
+    pocketItems.pushBack(poccketItem1);
+
+    auto item2 = MyItem::create("30.png");
+    items.pushBack(item2);  // 物品2：铜剑
+    auto poccketItem2 = MyItem::create("30.png");
+    pocketItems.pushBack(poccketItem2);
+
+    auto item3 = MyItem::create("10.png", 30);
+    items.pushBack(item3);  // 物品3：土块（30个）
+    auto poccketItem3 = MyItem::create("10.png",30);
+    pocketItems.pushBack(poccketItem3);
+
+    auto item4 = MyItem::create("12.png", 48);
+    items.pushBack(item4);  // 物品4：木材（48个）
+    auto poccketItem4 = MyItem::create("12.png",48);
+    pocketItems.pushBack(poccketItem4);
+
+    while (items.size() < 32) {
+        auto emptyItem = MyItem::create("0.png");
+        items.pushBack(emptyItem);  // 当背包袋中的物品少于32个时
+    }
+
+    while (pocketItems.size() < 8) {
+        auto pocketEmptyItem = MyItem::create("0.png");
+        pocketItems.pushBack(pocketEmptyItem);  // 当背包袋中的物品少于8个时
+    }
+    movingItem = MyItem::create("0.png");
+    movingItem->retain();
+
     this->checkPocket();    // 显示口袋物品（并更换手中的物品）
     this->checkBag();       // 显示物品栏（即背包，并整理背包物品）
+
+    // 添加鼠标事件监听
+    auto mouseListener = EventListenerMouse::create();
+    mouseListener->onMouseMove = [=](EventMouse* event) {
+        if (movingItem->isVisible() && itemInMove) {
+            itemInMove->setPosition(event->getLocation());
+            itemInMove->setPositionY(Director::getInstance()->getVisibleSize().height - itemInMove->getPosition().y);
+        }
+        };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(mouseListener, this);
 
     return true;
 }
@@ -202,7 +240,12 @@ void GameScene::addKeyboardListener(Sprite* hero)
             break;
         case EventKeyboard::KeyCode::KEY_ESCAPE: // 切换背包/口袋
             if (bagLayer->isVisible()) {
-                itemInMove->setVisible(false);
+                if (itemInMove) {
+                    itemInMove->setVisible(false);      // 首先隐去鼠标
+                    itemInMove = nullptr;
+                }
+                if (movingItem->getItemName() != "0.png")
+                    movingItem->setVisible(false);      // 把尚在手中的物品归位
                 ClickToChangePosition(nullptr, -1);
                 bagLayer->setVisible(false);
                 pocketLayer->setVisible(true);
