@@ -1,10 +1,20 @@
 #include "GameScene.h"
+#include "SimpleAudioEngine.h"
 
 USING_NS_CC;
+#define End 10673
+#define HeroHealth 100 //英雄的血量
+#define BlocksFirstGID 4
 
-const float gravity = -3.0f; // 重力加速度
-const float maxFallSpeed = -200.0f; // 最大下落速度
-bool overland = 0;
+
+//地图
+cocos2d::TMXTiledMap* map;
+float mapWidth;
+float mapHeight;
+
+// 图层相关
+cocos2d::TMXLayer* blocksLayer = nullptr; // 不能穿越的阻挡层
+cocos2d::TMXLayer* itemsLayer = nullptr;  // 可穿越的物品层
 
 Scene* GameScene::createScene()
 {
@@ -18,11 +28,30 @@ bool GameScene::init()
         return false;
     }
 
+    initWithPhysics(); // 引入物理组件
+    this->getPhysicsWorld()->setGravity(Vec2(0, -980)); // 设置重力
+
+    auto camera = Camera::create();
+    camera->setCameraFlag(CameraFlag::USER1);
+    this->addChild(camera);
+    camera->setName("Camera");
+
+    // 加载精灵帧
+    SpriteFrameCache::getInstance()->addSpriteFramesWithFile("man.plist");  // 加载 plist 文件
+
+    auto textureCache = Director::getInstance()->getTextureCache();
     auto visibleSize = Director::getInstance()->getVisibleSize();
     Vec2 origin = Director::getInstance()->getVisibleOrigin();
 
     // 创建地图
-    map = TMXTiledMap::create("testmap.tmx");
+    map = TMXTiledMap::create("map1.tmx");
+
+    // 获取地图尺寸
+    const auto mapSize = map->getMapSize();
+    const auto tileSize = map->getTileSize();
+    mapWidth = mapSize.width * tileSize.width;
+    mapHeight = mapSize.height * tileSize.height;
+
     if (!map)
     {
         CCLOG("Failed to load map.");
@@ -32,230 +61,95 @@ bool GameScene::init()
     map->setScale(1.0f);
     map->setName("map"); // 设置名称
     this->addChild(map, 0);
-
-    // 获取地图尺寸
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
+    map->setCameraMask((unsigned short)CameraFlag::USER1);
 
     // 加载图层
     blocksLayer = map->getLayer("blocks");
     itemsLayer = map->getLayer("items");
+    dayLayer = map->getLayer("day");      // 白天背景图层
+    nightLayer = map->getLayer("night");  // 夜晚背景图层
+    // 初始时显示白天背景
+    dayLayer->setVisible(true);
+    nightLayer->setVisible(false);
+
+    PhysicsMaterial PhyM(0, 0, 0);
+    for (int x = 0; x < mapSize.width; x++)
+    {
+        for (int y = 0; y < mapSize.height; y++)
+        {
+            // 获取瓦片
+            auto tile = blocksLayer->getTileAt(Vec2(x, y));
+
+            // 如果瓦片存在，则创建刚体
+            if (tile)
+            {
+                // 创建物理刚体
+                auto bodyOfBlocks = PhysicsBody::createBox(tileSize, PhyM);
+                bodyOfBlocks->setDynamic(false);
+                // 将刚体附加到瓦片节点
+                tile->setPhysicsBody(bodyOfBlocks);
+            }
+        }
+    }
+
+    //添加空气墙
+    auto airWallD = Node::create();
+    auto wallBodyD = PhysicsBody::createBox(Size(mapWidth, 1), PhysicsMaterial(0.0f, 1.0f, 1.0f));
+    wallBodyD->setDynamic(false); // 静态物体，不会移动
+    airWallD->setPhysicsBody(wallBodyD);
+    airWallD->setPosition(Vec2(visibleSize.width / 2, (visibleSize.height - mapHeight) / 2));
+    this->addChild(airWallD);
+
+    auto airWallU = Node::create();
+    auto wallBodyU = PhysicsBody::createBox(Size(mapWidth, 1), PhysicsMaterial(0.0f, 1.0f, 1.0f));
+    wallBodyU->setDynamic(false); // 静态物体，不会移动
+    airWallU->setPhysicsBody(wallBodyU);
+    airWallU->setPosition(Vec2(visibleSize.width / 2, (visibleSize.height + mapHeight) / 2));
+    this->addChild(airWallU);
 
     // 创建主角
-    hero = Sprite::create("hero.png");
+    hero = Hero::create("man1.png", HeroHealth);
     if (!hero)
     {
         CCLOG("Failed to load hero.");
         return false;
     }
+    hero->addPhy();
+    hero->setCameraMask((unsigned short)CameraFlag::USER1);
     // 主角初始位置设置为屏幕中心
     hero->setPosition(visibleSize.width / 2, visibleSize.height / 2);
     hero->setName("hero"); // 设置名称
     this->addChild(hero, 1); // 将主角添加到场景，而不是地图
 
     // 初始化地图位置
-    mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
+    auto mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
 
+    // 人物物品栏初始化
+    //hero->iniitems();
     // 添加键盘操作
-    addKeyboardListener(hero);
+    hero->addKeyboardListener();
+    // 添加鼠标操作
+    hero->addTouchListener();
 
-    this->scheduleUpdate(); // 调度更新方法
+    hero->schedule(CC_SCHEDULE_SELECTOR(Hero::HeroFunc)); //主角的运动
+
+    /*更新视角位置*/
+    this->schedule([=](float delta) {
+        updateCameraPosition(hero);
+        }, "update_camera");
+
+    // 添加天气更新调度
+    this->schedule([=](float delta) {
+        updateWeather(delta);  // 更新天气
+        }, 1.0f / 60.0f, "weather_update_key");
 
     return true;
 }
 
-void GameScene::update(float delta)
-{
-    // 获取地图和主角
-    if (!map || !hero)
-    {
-        CCLOG("Map or Hero not found.");
-        return;
-    }
 
-    // 获取可见尺寸和地图尺寸
-    auto visibleSize = Director::getInstance()->getVisibleSize();
-    auto mapSize = map->getMapSize();
-    auto tileSize = map->getTileSize();
-    float mapWidth = mapSize.width * tileSize.width;
-    float mapHeight = mapSize.height * tileSize.height;
-
-    // 更新跳跃和下落逻辑
-    if (isJumping)
-    {
-        /* // 检查跳跃是否碰到阻挡物
-        //int tileGID = checkBlockCollision(hero->getPositionX(), hero->getPositionY() - currentJumpHeight);
-        if (1) // 如果碰到方块（GID >= 181）//tileGID >= 181
-        {
-            currentJumpHeight = 0.0f; // 停止跳跃
-            jumpVelocity = 0.0f;      // 跳跃速度归零
-            isJumping = false;        // 跳跃状态结束
-        }*/
-
-        /*// 更新跳跃高度
-        currentJumpHeight += jumpVelocity * delta;
-        jumpVelocity += jumpAcceleration * delta;
-
-        // 更新地图位置，根据跳跃和下落调整
-
-        map->setPosition(mapPosition.x, mapPosition.y - currentJumpHeight);
-
-        // 检查跳跃是否结束（速度为 0 时结束跳跃）
-        if (jumpVelocity <= 0.0f)
-        {
-            jumpVelocity = 0.0f;  // 确保速度为 0
-            isJumping = false;    // 跳跃结束
-            currentJumpHeight = 0.0f; // 重置跳跃高度
-        }*/
-        applyJump(delta);
-    }
-    else
-    {
-        // 自由落体
-        applyGravity(delta);
-    }
-
-    
-
-    // 更新地图位置
-    //mapPosition.y = std::max(mapPosition.y - currentJumpHeight, -map->getTileSize().height); // 防止地图位置超出下边界
-    //map->setPosition(mapPosition);
-
-    // 更新左右移动逻辑
-    if (moveLeft)
-    {
-        mapPosition.x += 3; // 向左移动
-        // 限制地图不能超出左边界
-        if (mapPosition.x >= mapWidth / 2 - 10)
-        {
-            mapPosition.x = mapWidth / 2 - 10;
-        }
-        if (checkBlockCollision(hero->getPositionX() + 10, hero->getPositionY()) >= 181)
-        {
-            mapPosition.x = mapPosition.x - 10;
-        }
-    }
-    if (moveRight)
-    {
-        mapPosition.x -= 3; // 向右移动
-        // 限制地图不能超出右边界
-        if (mapPosition.x <= -mapWidth / 2 + 10)
-        {
-            mapPosition.x = -mapWidth / 2 + 10;
-        }
-        if (checkBlockCollision(hero->getPositionX() - 10, hero->getPositionY()) >= 181)
-        {
-            mapPosition.x = mapPosition.x + 10;
-        }
-    }
-
-    map->setPosition(mapPosition);
-}
-
-void GameScene::addKeyboardListener(Sprite* hero)
-{
-    auto keyboardListener = EventListenerKeyboard::create();
-
-    keyboardListener->onKeyPressed = [=](EventKeyboard::KeyCode keyCode, Event* event) {
-        // 处理按下按键
-        switch (keyCode)
-        {
-        case EventKeyboard::KeyCode::KEY_A: // 向左移动
-            moveLeft = true;
-            break;
-        case EventKeyboard::KeyCode::KEY_D: // 向右移动
-            moveRight = true;
-            break;
-        case EventKeyboard::KeyCode::KEY_SPACE: // 跳跃
-            performJump(hero);
-            break;
-        default:
-            break;
-        }
-        };
-
-    keyboardListener->onKeyReleased = [=](EventKeyboard::KeyCode keyCode, Event* event) {
-        // 处理松开按键
-        switch (keyCode)
-        {
-        case EventKeyboard::KeyCode::KEY_A: // 停止向左移动
-            moveLeft = false;
-            break;
-        case EventKeyboard::KeyCode::KEY_D: // 停止向右移动
-            moveRight = false;
-            break;
-        default:
-            break;
-        }
-        };
-
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(keyboardListener, this);
-}
-
-void GameScene::performJump(Sprite* hero)
-{
-    // 检查角色是否站在地面上，只有站在地面上才能跳跃
-    if (!isJumping)
-    {
-        isJumping = true;               // 设置为跳跃状态
-        jumpVelocity = 100.0f;          // 设置跳跃速度
-        maxJumpHeight = 100.0f;         // 设置最大跳跃高度
-        currentJumpHeight = 0.0f;       // 初始化当前跳跃高度
-    }
-}
-
-void GameScene::applyJump(float delta)
-{
-    currentJumpHeight += jumpVelocity * delta; // 以恒定速度上升
-
-    // 更新 mapPosition.y，保持角色在屏幕中间
-    mapPosition.y -= jumpVelocity * delta;
-
-    // 检查是否达到最大跳跃高度
-    if (currentJumpHeight >= maxJumpHeight)
-    {
-        isJumping = false;  // 停止跳跃，开始自由落体
-        currentJumpHeight = 0.0f;
-    }
-}
-
-void GameScene::applyGravity(float delta)
-{
-    // 检查角色是否在空中下落
-    if (checkBlockCollision(hero->getPositionX(), hero->getPositionY() - 15) < 181) // 如果下面没有阻挡物
-    {
-        fallSpeed += fallAcceleration * delta; // 下落加速度
-        mapPosition.y -= fallSpeed; // 更新地图位置，角色始终保持在屏幕中间
-        //map->setPosition(mapPosition.x, mapPosition.y);
-        //hero->setPositionY(hero->getPositionY() + fallSpeed); // 更新主角的Y位置
-    }
-    else
-    {   
-        // 如果角色落地了，停止下落
-        fallSpeed = 0.0f;
-    }
-}
-
-int GameScene::checkBlockCollision(float x, float y)
-{
-    // 获取瓦片坐标
-    Vec2 tileCoord = getTileCoordForPosition(x, y);
-
-    // 首先检查 blocksLayer 上的瓦片 GID
-    int blockGID = blocksLayer->getTileGIDAt(tileCoord);
-
-    if (blockGID >= 181) // 如果是方块（GID >= 181）
-    {
-        return blockGID; // 返回方块的 GID，表示碰到障碍物
-    }
-
-    return 0; // 没有碰撞
-}
-
-Vec2 GameScene::getTileCoordForPosition(float x, float y)
+/*得到瓦片坐标*/
+Vec2 getTileCoordForPosition(float x, float y)
 {
     // 获取地图的Tile大小
     Size tileSize = map->getTileSize();
@@ -272,7 +166,102 @@ Vec2 GameScene::getTileCoordForPosition(float x, float y)
     return Vec2(tileX, tileY);
 }
 
+/*判断与瓦片是否发生碰撞*/
+int checkBlockCollision(float x, float y)
+{
+    // 获取瓦片坐标
+    Vec2 tileCoord = getTileCoordForPosition(x, y);
 
+    //取得图层的大小
+    Size layerSize = blocksLayer->getLayerSize();
 
+    if (tileCoord.x >= 0 && tileCoord.x < layerSize.width && tileCoord.y >= 0 && tileCoord.y < layerSize.height) { //判断瓦片的位置是否合法
+        // 首先检查 blocksLayer 上的瓦片 GID
+        int blockGID = blocksLayer->getTileGIDAt(tileCoord);
 
-    
+        if (blockGID >= BlocksFirstGID) // 如果是方块（GID >= BlocksFirstGID）
+        {
+            return blockGID; // 返回方块的 GID，表示碰到障碍物
+        }
+        else {
+            return 0; // 没有碰撞
+        }
+    }
+    return BlocksFirstGID;
+}
+
+/*更新视角的函数*/
+void GameScene::updateCameraPosition(Sprite* player) {
+    auto camera = this->getChildByName<Camera*>("Camera");
+    auto playerPosition = player->getPosition();
+
+    // 保持摄像机中心在主角位置
+    camera->setPosition(Vec2(playerPosition.x, playerPosition.y));
+}
+
+/*void GameScene::addPhysicsBodiesForVisibleTiles() {
+    auto tileMap = map;
+    auto collidableLayer = blocksLayer;
+
+    auto visibleSize = Director::getInstance()->getVisibleSize();
+    auto origin = Director::getInstance()->getVisibleOrigin();
+
+    // 获取屏幕视野范围
+    Rect visibleRect = Rect(origin.x, origin.y, visibleSize.width, visibleSize.height);
+
+    // 遍历地图中的所有瓦片
+    for (int x = 0; x < tileMap->getMapSize().width; ++x) {
+        for (int y = 0; y < tileMap->getMapSize().height; ++y) {
+            auto tilePos = Vec2(x, y);
+            auto tileSprite = collidableLayer->getTileAt(tilePos);
+            if (!tileSprite) continue; // 跳过无效瓦片
+
+            // 获取瓦片的包围框
+            auto tileBoundingBox = tileSprite->getBoundingBox();
+
+            // 检查是否在视野范围内
+            if (visibleRect.intersectsRect(tileBoundingBox)) {
+                // 如果瓦片没有物理刚体，添加物理刚体
+                if (!tileSprite->getPhysicsBody()) {
+                    auto physicsBody = PhysicsBody::createBox(tileBoundingBox.size, PhysicsMaterial(1e10, 0, 1));
+                    physicsBody->setDynamic(false); // 静态刚体
+                    tileSprite->addComponent(physicsBody);
+                }
+            }
+            else {
+                // 如果瓦片不在视野范围内，移除物理刚体
+                if (tileSprite->getPhysicsBody()) {
+                    tileSprite->removeComponent(tileSprite->getPhysicsBody());
+                }
+            }
+        }
+    }
+}*/
+
+void GameScene::updateWeather(float deltaTime)
+{
+    // 假设你使用timeOfDay来判断白天和夜晚
+    timeOfDay += deltaTime;
+
+    if (timeOfDay >= 24)
+    {
+        timeOfDay = 0;
+        isDay = !isDay;
+        changeBackground();
+    }
+}
+
+void GameScene::changeBackground()
+{
+    if (isDay)
+    {
+        dayLayer->setVisible(true);  // 显示白天背景
+        nightLayer->setVisible(false);  // 隐藏夜晚背景
+    }
+    else
+    {
+        dayLayer->setVisible(false);  // 隐藏白天背景
+        nightLayer->setVisible(true);  // 显示夜晚背景
+    }
+}
+
