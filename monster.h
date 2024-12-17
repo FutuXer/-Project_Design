@@ -1,4 +1,5 @@
 #pragma once
+#pragma once
 #include"cocos2d.h"
 class Silme :public cocos2d::Sprite {
     int health; // 当前血量
@@ -41,6 +42,9 @@ public:
     void addjellyeffect(); //添加了果冻效果
     void addPhy(); //添加了物理效果
     void addhealthbar(); //添加血条
+    void brodercheck(float dt); //防止史莱姆掉出地图边界
+    void AttackPlayer(float dt); //攻击主角
+    void DoAttack();
 };
 
 class Zombie :public cocos2d::Sprite {
@@ -85,4 +89,7 @@ public:
     void addPhy(); //添加物理效果
     void addAnimate(); //添加动画
     void addhealthbar(); //添加血条
+    void jump(float dt); //僵尸跳跃的逻辑
+    void AttackPlayer(float dt); //攻击主角
+    void DoAttack();
 };
