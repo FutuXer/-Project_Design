@@ -3,61 +3,42 @@
 #define __GAME_SCENE_H__
 
 #include "cocos2d.h"
+#include "hero.h"
+#include "ui/CocosGUI.h"
 
 class GameScene : public cocos2d::Scene
 {
 public:
     static cocos2d::Scene* createScene();
     virtual bool init();
-    virtual void update(float delta) override;
+    //virtual void update(float delta) override;
     CREATE_FUNC(GameScene);
 
 private:
-    void addKeyboardListener(cocos2d::Sprite* hero); // 添加键盘监听器
-    void performJump(cocos2d::Sprite* hero);         // 执行跳跃动作
     int GameScene::checkBlockCollision(float x, float y);      // 检查与blocksLayer的碰撞
-    void applyGravity(float delta);                   // 应用重力
-    void applyJump(int delta);
-    void interactWithItems();                        // 与itemsLayer进行交互
     float getBlockTopY(float heroX, float heroY);
     void updatePhysicsWorld(float delta);
-    void checkAndFixHeroCollision();
 
-    //动画相关
-    void setHeroAnimation(const std::string& frame2, const std::string& frame3, const std::string& frame4, const std::string& frame5);
+    //void addPhysicsBodiesForVisibleTiles();
 
-
-    // 获取瓦片坐标
-    cocos2d::Vec2 getTileCoordForPosition(float x, float y);
+    void updateCameraPosition(cocos2d::Sprite* player);
 
     // 新增成员变量以便保存地图和主角的位置关系
-    cocos2d::TMXTiledMap* map;
-    cocos2d::Sprite* hero;
+    Hero* hero;
 
-    // 保存当前地图的位置
-    cocos2d::Vec2 mapPosition;
-
-    // 控制地图移动的变量
-    bool moveLeft = false;
-    bool moveRight = false;
-
-    // 跳跃相关
-    bool isJumping = false;
-    float jumpVelocity = 0.0f;
-    float jumpAcceleration = -200.0f;
-    float maxJumpHeight = 30.0f;
-    float currentJumpHeight = 0.0f;
-
-    // 图层相关
-    cocos2d::TMXLayer* blocksLayer = nullptr; // 不能穿越的阻挡层
-    cocos2d::TMXLayer* itemsLayer = nullptr;  // 可穿越的物品层
-
-    // 
-    float fallSpeed = 0.0f;            // 当前下落速度
-    float fallAcceleration = -3.0f;    // 下落加速度（通常是地球重力加速度）
+    //天气系统
+    bool isDay = 1;                      // 当前是否白天
+    float timeOfDay;                     // 游戏内的时间
+    cocos2d::TMXLayer* dayLayer;         // 白天背景图层
+    cocos2d::TMXLayer* nightLayer;       // 夜晚背景图层
+    void updateWeather(float deltaTime);  
+    void changeBackground();
+    void updateSunAndMoonPosition(float deltaTime);
 };
 
 #endif // __GAME_SCENE_H__
+
+
 
 
 
