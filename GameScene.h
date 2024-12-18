@@ -31,6 +31,10 @@ private:
     /*敌怪相关*/
     void MonsterFunc(float dt); //生成怪物与运行怪物的函数 
     int numberOfMonsters = 0; //地图中怪物的数量
+    int numberOfnpcs = 0; //地图中npc的数量
+    void GameScene::NPCFunc(float dt);
+
+
     bool onContactBegin(cocos2d::PhysicsContact& contact); //添加碰撞
 };
 

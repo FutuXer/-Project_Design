@@ -175,6 +175,7 @@ bool GameScene::init()
     hero->setName("hero"); // 设置名称
     this->addChild(hero, 1); // 将主角添加到场景，而不是地图
 
+
     // 初始化地图位置
     auto mapPosition = Vec2((visibleSize.width - mapWidth) / 2, (visibleSize.height - mapHeight) / 2);
     map->setPosition(mapPosition);
@@ -185,8 +186,9 @@ bool GameScene::init()
 
     hero->schedule(CC_SCHEDULE_SELECTOR(Hero::HeroFunc)); //主角的运动
 
-    /********敌怪相关*******/this->schedule(CC_SCHEDULE_SELECTOR(GameScene::MonsterFunc), 1.0f); //怪物的生成与运动
+    /********敌怪相关*******///this->schedule(CC_SCHEDULE_SELECTOR(GameScene::MonsterFunc), 1.0f); //怪物的生成与运动
 
+    /********npc相关*******/this->schedule(CC_SCHEDULE_SELECTOR(GameScene::NPCFunc), 1.0f); //npc的生成与运动
 
     /*更新视角位置*/
     this->schedule([=](float delta) {
@@ -250,7 +252,7 @@ void GameScene::updateCameraPosition(Sprite* player) {
 
 //*********敌怪相关
 
-/*产生并运行怪物的函数*/
+/*产生并运行怪物的函数*/  
 void GameScene::MonsterFunc(float dt) {
     // 获取屏幕大小
     Size visibleSize = Director::getInstance()->getVisibleSize();
@@ -285,4 +287,45 @@ void GameScene::MonsterFunc(float dt) {
         }
         numberOfMonsters++;
     }
+}
+
+void GameScene::NPCFunc(float dt) {
+    Size visibleSize = Director::getInstance()->getVisibleSize();
+    if (numberOfnpcs < 1) {
+        // 创建 NPC
+        auto npc1 = NPC::create("npc1.png", 100);
+
+        // 随机生成 NPC 的位置
+        float x_Z = RandomHelper::random_real((visibleSize.width - mapWidth) / 2 + npc1->getContentSize().width / 2, (visibleSize.width + mapWidth) / 2 - npc1->getContentSize().width / 2);
+        npc1->setPosition(Vec2(x_Z, visibleSize.height / 1.5f));
+
+        // 添加物理效果
+        npc1->addPhy();
+
+
+        //加动画效果
+        npc1->addAnimate();
+        
+        
+        
+        // 添加血条
+        npc1->addhealthbar();
+
+        // 将 NPC 加入到场景中
+        this->addChild(npc1);
+
+        // 设置 NPC 的相机
+        npc1->setCameraMask((unsigned short)CameraFlag::USER1);
+
+        // 开始 NPC 的运动
+        npc1->schedule(CC_SCHEDULE_SELECTOR(NPC::npc_move));
+        npc1->schedule(CC_SCHEDULE_SELECTOR(NPC::jump), 1);
+        npc1->schedule(CC_SCHEDULE_SELECTOR(NPC::approachplayer), 1, -1, 0);
+
+        // 启用触摸监听器，检测是否点击 NPC 来显示交互菜单
+        npc1->addTouchListener();
+    }
+
+    // 更新 NPC 数量
+    numberOfnpcs++;
 }
