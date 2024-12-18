@@ -5,17 +5,11 @@
 USING_NS_CC;
 using namespace ui;
 
-void GameScene::checkPocket() {
-    pocketLayer = Layer::create();  // 创建口袋图层
-    this->addChild(pocketLayer);
-
+void Hero::checkPocket() {
     // 获取可见区域的大小
     auto visibleSize = Director::getInstance()->getVisibleSize();
     float scaleX = visibleSize.width / 960;
     float scaleY = visibleSize.height / 640;
-
-    // 设置菜单Layer的位置，左上角
-    pocketLayer->setPosition(Vec2(40 * scaleX, visibleSize.height - 40 * scaleY));
 
     // 框的大小
     Size boxSize(50 * scaleY, 50 * scaleY);
@@ -26,18 +20,18 @@ void GameScene::checkPocket() {
     for (int i = 0; i < 8; ++i) {
         // 创建灰色半透明的框（即按钮）
         auto pocketButton = Button::create("Button0.png");
+        this->addChild(pocketButton, 1, i);          // 给每个框一个唯一的tag
+        pocketButton->setCameraMask((unsigned short)CameraFlag::USER1);
         pocketButton->ignoreContentAdaptWithSize(false);     // 允许按钮根据 contentSize 进行调整
         pocketButton->setColor(Color3B(128, 128, 128));
         pocketButton->setOpacity(128);
         pocketButton->setContentSize(boxSize);
-        pocketButton->setPosition(Vec2(i * (boxSize.width + padding), 0));
+        pocketButton->setPosition(Vec2((i + 1) * (boxSize.width + padding) - visibleSize.width / 2, visibleSize.height / 2 - boxSize.height / 3));
         pocketButton->addTouchEventListener([this, i](Ref* sender, Widget::TouchEventType type) {
             if (type == Widget::TouchEventType::ENDED) {
                 this->onItemMenuClicked(sender, i);
             }
             });
-
-        pocketLayer->addChild(pocketButton, 1, i);  // 给每个框一个唯一的tag
 
         // 把pocketItems[i]（初始状态下的）添加到pocketButton[i]之下
       
@@ -45,17 +39,18 @@ void GameScene::checkPocket() {
         pocketItems.at(i)->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
 
         pocketButton->addChild(pocketItems.at(i));
+        pocketItems.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
     }
 }
 
-void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
+void Hero::onItemMenuClicked(Ref* sender, int itemIndex) {
    CCLOG("Item %d menu item clicked", itemIndex);
 
     // 确保游戏角色只能同时拿起一个物品
-    static int currentItem = -1;
+    static int currentItem = -1;                                 
     if (currentItem != -1) {
         // 将之前选中的框恢复为灰色
-        auto previousBox = pocketLayer->getChildByTag(currentItem);
+        auto previousBox = this->getChildByTag(currentItem);
         if (previousBox) {
             previousBox->setColor(Color3B(128, 128, 128));
             previousBox->setOpacity(128);
@@ -66,7 +61,7 @@ void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
     currentItem = itemIndex;
 
     // 将选中的框变成黄色
-    auto selectedBox = pocketLayer->getChildByTag(itemIndex);
+    auto selectedBox = this->getChildByTag(itemIndex);
     if (selectedBox) {
         selectedBox->setColor(Color3B(255, 255, 0));
         selectedBox->setOpacity(128);
@@ -75,24 +70,18 @@ void GameScene::onItemMenuClicked(Ref* sender, int itemIndex) {
     this->ItemsInHand(itemIndex);
 }
 
-void GameScene::ItemsInHand(int itemTag) {
+void Hero::ItemsInHand(int itemTag) {
     // 根据itemTag实现拿起不同物品的逻辑
     // auto itemInHand = Sprite::create("");
 }
 
-void GameScene::checkBag() {
-    bagLayer = Layer::create();
-    this->addChild(bagLayer);
-
+void Hero::checkBag() {
     // 获取可见区域的大小
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
     // 根据设计分辨率计算缩放比例
     float scaleX = visibleSize.width / 960;
     float scaleY = visibleSize.height / 640;
-
-    // 设置菜单Layer的位置，左上角
-    bagLayer->setPosition(Vec2(30 * scaleX, visibleSize.height - 30 * scaleY));
 
     // 框的大小
     Size boxSize(40 * scaleY, 40 * scaleY);
@@ -108,59 +97,49 @@ void GameScene::checkBag() {
         bagButton->setColor(Color3B(128, 128, 128));
         bagButton->setOpacity(128);
         bagButton->setContentSize(boxSize);
-        bagButton->setPosition(Vec2((i % 8) * (boxSize.width + paddingX), -(i / 8) * (boxSize.height + paddingY)));
+        bagButton->setPosition(Vec2((i % 8 + 1) * (boxSize.width + paddingX) - visibleSize.width / 2, visibleSize.height / 2 - (i / 8) * (boxSize.height + paddingY) - boxSize.height / 3));
         bagButton->addTouchEventListener([this, i](Ref* sender, Widget::TouchEventType type) {
             if (type == Widget::TouchEventType::ENDED) {
                 this->ClickToChangePosition(sender, i);
             }
             });
 
-        bagLayer->addChild(bagButton, 1, i);  // 给每个框一个唯一的tag
+        this->addChild(bagButton, 1, i + 10);  // 给每个框一个唯一的tag，为了与pocketButton区分，把它设置成负数
+        bagButton->setCameraMask((unsigned short)CameraFlag::USER1);
 
         // 把items[i]（初始状态下的）添加到bagButton[i]之下
         items.at(i)->setScale(scaleY);
         items.at(i)->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
+        items.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
 
         bagButton->addChild(items.at(i));
+        bagButton->setCameraMask((unsigned short)CameraFlag::USER1);
+        bagButton->setVisible(false);                                      // 初始条件下不可见
     }
-    
+    auto bagLabel = Label::create();
+    bagLabel->setString(u8"物品栏");
+    this->addChild(bagLabel, 1);
+    bagLabel->setCameraMask((unsigned short)CameraFlag::USER1);
+    bagLabel->setScale(scaleY);
+    bagLabel->setPosition(Vec2(boxSize.width + paddingX - visibleSize.width / 2, visibleSize.height / 2 - 4 * (boxSize.height + paddingY / 2) - boxSize.height / 3));
 
-    bagLayer->setVisible(false);  // 初始化状态下设置为不可见
+    bagLabel->setVisible(false);  // 初始化状态下设置为不可见
 }
 
-void GameScene::ClickToChangePosition(Ref* sender, int itemIndex) {
+void Hero::ClickToChangePosition(Ref* sender, int itemIndex) {
     CCLOG("Item %d menu item clicked", itemIndex);
-
-    // 只用按esc切回pocket界面时才会调用，防止背包中因为整理而丢失物品
-    if (sender == nullptr && itemIndex == -1) {
-        if (movingItem->getItemName() == "0.png")
-            return;                         // 手中已经空了，无需安排
-        for (int i = 0; i < items.size(); ++i) {
-            if (items.at(i)->getItemName() == "0.png") {
-                // 把物品放在第一个空位置上
-                items.at(i)->coppyItem(movingItem);           
-                // 如果改动了第一行的图标，同步修改口袋中的物品
-                if (i < 8) {
-                    pocketItems.at(i)->coppyItem(movingItem);
-                }
-                break;
-            }
-        }
-
-        movingItem = MyItem::create("0.png");  // 当玩家关闭背包时
-        movingItem->retain();
-        return;
-    }
 
     // 重新安排物品的位置
     if (itemIndex >= 0 && itemIndex < items.size()) {
         // 实质上是交换items向量中的位置
         auto temp = MyItem::create(items.at(itemIndex)->getItemName(), items.at(itemIndex)->getNum());
         items.at(itemIndex)->coppyItem(movingItem);
+        items.at(itemIndex)->setCameraMask((unsigned short)CameraFlag::USER1);
 
         // 如果改动了第一行的图标，同步修改口袋中的物品
         if (itemIndex < 8) {
            pocketItems.at(itemIndex)->coppyItem(movingItem);
+           pocketItems.at(itemIndex)->setCameraMask((unsigned short)CameraFlag::USER1);
         }
 
         movingItem->coppyItem(temp);                // 更新正在移动的物品
@@ -169,15 +148,16 @@ void GameScene::ClickToChangePosition(Ref* sender, int itemIndex) {
         if (itemInMove == nullptr) {
             itemInMove = Sprite::create(movingItem->getItemName());
             this->addChild(itemInMove, 1);
-            itemInMove->setVisible(true);
+            itemInMove->setCameraMask((unsigned short)CameraFlag::USER1);
         }
         else {
             itemInMove->setTexture(movingItem->getItemName());
+            itemInMove->setCameraMask((unsigned short)CameraFlag::USER1);
         }
     }
 }
 
-void GameScene::calculate() {
+void Hero::calculate() {
     for (int i = 0; i < 12; i++) {
         int Index;                                                      
         int ingredient1 = findItemCount(std::to_string(dictionary[i][2]) + ".png", Index);
@@ -188,8 +168,10 @@ void GameScene::calculate() {
             if (itemsToBeMade.size() < 12)              // 初始化时pushBack
                 itemsToBeMade.pushBack(CanBeMade);    
             else {                                      // 后续更新
-                if (itemsToBeMade.at(i)->getItemName() == "0.png")
+                if (itemsToBeMade.at(i)->getItemName() == "0.png") {
                     itemsToBeMade.at(i)->coppyItem(CanBeMade);
+                    itemsToBeMade.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
+                }
             }
         }
         else {
@@ -197,15 +179,17 @@ void GameScene::calculate() {
             if (itemsToBeMade.size() < 12)              // 初始化时pushBack
                 itemsToBeMade.pushBack(CannotBe);
             else {                                      // 后续更新
-                if (itemsToBeMade.at(i)->getItemName() != "0.png")
+                if (itemsToBeMade.at(i)->getItemName() != "0.png") {
                     itemsToBeMade.at(i)->coppyItem(CannotBe);
+                    itemsToBeMade.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
+                }
             }
         }
         // 否则原料不足，显示空图
     }
 }
 
-void GameScene::checkProduction() {
+void Hero::checkProduction() {
     // 获取可见区域的大小
     auto visibleSize = Director::getInstance()->getVisibleSize();
 
@@ -227,8 +211,10 @@ void GameScene::checkProduction() {
         ProduceButton->setColor(Color3B(128, 128, 128));
         ProduceButton->setOpacity(128);
         ProduceButton->setContentSize(boxSize);
-        bagLayer->addChild(ProduceButton, 1, i * 10);  // 给每个框一个唯一的tag（比物品栏大10倍，区分开）
-        ProduceButton->setPosition(Vec2((i % 6) * (boxSize.width + paddingX), -visibleSize.height + (- i / 6 + 3) * (boxSize.height + paddingY)));
+        this->addChild(ProduceButton, 1, (i + 1) * 100);  // 给每个框一个唯一的tag（tag从100开始）
+        ProduceButton->setCameraMask((unsigned short)CameraFlag::USER1);
+        ProduceButton->setVisible(false);
+        ProduceButton->setPosition(Vec2((i % 6 + 1) * (boxSize.width + paddingX) - visibleSize.width / 2, -visibleSize.height / 4 - (i / 6 + 1) * (boxSize.height + paddingY) - paddingY));
         ProduceButton->addTouchEventListener([this, i](Ref* sender, Widget::TouchEventType type) {
             if (type == Widget::TouchEventType::ENDED) {
                 this->ClickToProduce(sender, i * 10);
@@ -240,10 +226,18 @@ void GameScene::checkProduction() {
         itemsToBeMade.at(i)->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
 
         ProduceButton->addChild(itemsToBeMade.at(i));
+        itemsToBeMade.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
     }
+    auto productionLabel = Label::create();
+    productionLabel->setString(u8"制作栏");
+    this->addChild(productionLabel, 1);
+    productionLabel->setCameraMask((unsigned short)CameraFlag::USER1);
+    productionLabel->setVisible(false);
+    productionLabel->setScale(scaleY);
+    productionLabel->setPosition(Vec2(boxSize.width + paddingX - visibleSize.width / 2, -visibleSize.height / 4 - paddingY));
 }
 
-void GameScene::ClickToProduce(Ref* sender, int itemIndex) {
+void Hero::ClickToProduce(Ref* sender, int itemIndex) {
     int productIndex = itemIndex / 10, IndexInbag = -1;               // 如果该产品已经存在，则IndexInBag返回在背包中的位置
     std::string productName = itemsToBeMade.at(productIndex)->getItemName();
     if (productName == "0.png")
@@ -252,8 +246,10 @@ void GameScene::ClickToProduce(Ref* sender, int itemIndex) {
     // 如果合成的物品已经存在，且不是单体物品（工具和武器），则只需要把它的数量加一即可；否则需要单独开辟一个方块
     if (findItemCount(productName,IndexInbag) > 0 && productName[0] != '2' && productName[0] != '3') {
         items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() + 1);          // 已有产品的数量加一
+        items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
         if (IndexInbag < 8) {
             pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() + 1);
+            pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
         }
     }
     else {
@@ -261,9 +257,11 @@ void GameScene::ClickToProduce(Ref* sender, int itemIndex) {
             if (items.at(i)->getItemName() == "0.png") {
                 // 把产品放在第一个空位置上
                 items.at(i)->coppyItem(itemsToBeMade.at(productIndex));
+                items.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
                 // 如果改动了第一行的图标，同步修改口袋中的物品
                 if (i < 8) {
                     pocketItems.at(i)->coppyItem(itemsToBeMade.at(productIndex));
+                    pocketItems.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
                 }
                 break;
             }
@@ -283,17 +281,21 @@ void GameScene::ClickToProduce(Ref* sender, int itemIndex) {
 
     // 原材料1减去配方中的数量
     findItemCount(ingredient1Name, IndexInbag);
-    items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() - dictionary[line][1]);         
+    items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() - dictionary[line][1]); 
+    items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     if (IndexInbag < 8) {
         pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() - dictionary[line][1]);
+        pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     }
 
     // 原材料2减去配方中的数量
     IndexInbag = -1;
     findItemCount(ingredient2Name, IndexInbag);
     items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() - dictionary[line][3]);
+    items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     if (IndexInbag < 8) {
         pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() - dictionary[line][3]);
+        pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     }
 
     this->calculate();
