@@ -20,7 +20,7 @@ void Hero::checkPocket() {
     for (int i = 0; i < 8; ++i) {
         // 创建灰色半透明的框（即按钮）
         auto pocketButton = Button::create("Button0.png");
-        this->addChild(pocketButton, 1, i);          // 给每个框一个唯一的tag
+        this->addChild(pocketButton, 51, i);          // 给每个框一个唯一的tag
         pocketButton->setCameraMask((unsigned short)CameraFlag::USER1);
         pocketButton->ignoreContentAdaptWithSize(false);     // 允许按钮根据 contentSize 进行调整
         pocketButton->setColor(Color3B(128, 128, 128));
@@ -34,7 +34,6 @@ void Hero::checkPocket() {
             });
 
         // 把pocketItems[i]（初始状态下的）添加到pocketButton[i]之下
-      
         pocketItems.at(i)->setScale(scaleY);
         pocketItems.at(i)->setPosition(Vec2(boxSize.width / 2, boxSize.height / 2));
 
@@ -44,10 +43,10 @@ void Hero::checkPocket() {
 }
 
 void Hero::onItemMenuClicked(Ref* sender, int itemIndex) {
-   CCLOG("Item %d menu item clicked", itemIndex);
+    CCLOG("Item %d menu item clicked", itemIndex);
 
     // 确保游戏角色只能同时拿起一个物品
-    static int currentItem = -1;                                 
+    static int currentItem = -1;
     if (currentItem != -1) {
         // 将之前选中的框恢复为灰色
         auto previousBox = this->getChildByTag(currentItem);
@@ -66,13 +65,7 @@ void Hero::onItemMenuClicked(Ref* sender, int itemIndex) {
         selectedBox->setColor(Color3B(255, 255, 0));
         selectedBox->setOpacity(128);
     }
-
-    this->ItemsInHand(itemIndex);
-}
-
-void Hero::ItemsInHand(int itemTag) {
-    // 根据itemTag实现拿起不同物品的逻辑
-    // auto itemInHand = Sprite::create("");
+    usingItem = itemIndex;     // 改变正在使用的物品
 }
 
 void Hero::checkBag() {
@@ -132,18 +125,18 @@ void Hero::ClickToChangePosition(Ref* sender, int itemIndex) {
     // 重新安排物品的位置
     if (itemIndex >= 0 && itemIndex < items.size()) {
         // 实质上是交换items向量中的位置
-        auto temp = MyItem::create(items.at(itemIndex)->getItemName(), items.at(itemIndex)->getNum());
+        auto temp = MyItem::create(items.at(itemIndex)->getItemName(), items.at(itemIndex)->getItemNum());
         items.at(itemIndex)->coppyItem(movingItem);
         items.at(itemIndex)->setCameraMask((unsigned short)CameraFlag::USER1);
 
         // 如果改动了第一行的图标，同步修改口袋中的物品
         if (itemIndex < 8) {
-           pocketItems.at(itemIndex)->coppyItem(movingItem);
-           pocketItems.at(itemIndex)->setCameraMask((unsigned short)CameraFlag::USER1);
+            pocketItems.at(itemIndex)->coppyItem(movingItem);
+            pocketItems.at(itemIndex)->setCameraMask((unsigned short)CameraFlag::USER1);
         }
 
         movingItem->coppyItem(temp);                // 更新正在移动的物品
-    
+
         // 创更新正在移动中的物品精灵
         if (itemInMove == nullptr) {
             itemInMove = Sprite::create(movingItem->getItemName());
@@ -159,14 +152,14 @@ void Hero::ClickToChangePosition(Ref* sender, int itemIndex) {
 
 void Hero::calculate() {
     for (int i = 0; i < 12; i++) {
-        int Index;                                                      
+        int Index;
         int ingredient1 = findItemCount(std::to_string(dictionary[i][2]) + ".png", Index);
         int ingredient2 = findItemCount(std::to_string(dictionary[i][4]) + ".png", Index);
         // 若原料充足，则在itemsToBeMade的相应位置显示该物品，表示它可以被合成，则显示出来
         if (dictionary[i][0] != 0 && ingredient1 >= dictionary[i][1] && ingredient2 >= dictionary[i][3]) {
             auto CanBeMade = MyItem::create(std::to_string(dictionary[i][0]) + ".png");
             if (itemsToBeMade.size() < 12)              // 初始化时pushBack
-                itemsToBeMade.pushBack(CanBeMade);    
+                itemsToBeMade.pushBack(CanBeMade);
             else {                                      // 后续更新
                 if (itemsToBeMade.at(i)->getItemName() == "0.png") {
                     itemsToBeMade.at(i)->coppyItem(CanBeMade);
@@ -211,7 +204,7 @@ void Hero::checkProduction() {
         ProduceButton->setColor(Color3B(128, 128, 128));
         ProduceButton->setOpacity(128);
         ProduceButton->setContentSize(boxSize);
-        this->addChild(ProduceButton, 1, (i + 1) * 100);  // 给每个框一个唯一的tag（tag从100开始）
+        this->addChild(ProduceButton, 1, (i + 1) * 100);     // 给每个框一个唯一的tag（tag从100开始）
         ProduceButton->setCameraMask((unsigned short)CameraFlag::USER1);
         ProduceButton->setVisible(false);
         ProduceButton->setPosition(Vec2((i % 6 + 1) * (boxSize.width + paddingX) - visibleSize.width / 2, -visibleSize.height / 4 - (i / 6 + 1) * (boxSize.height + paddingY) - paddingY));
@@ -243,30 +236,7 @@ void Hero::ClickToProduce(Ref* sender, int itemIndex) {
     if (productName == "0.png")
         return;                          // 所合成的物品为空，直接返回不做反应
 
-    // 如果合成的物品已经存在，且不是单体物品（工具和武器），则只需要把它的数量加一即可；否则需要单独开辟一个方块
-    if (findItemCount(productName,IndexInbag) > 0 && productName[0] != '2' && productName[0] != '3') {
-        items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() + 1);          // 已有产品的数量加一
-        items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
-        if (IndexInbag < 8) {
-            pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() + 1);
-            pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
-        }
-    }
-    else {
-        for (int i = 0; i < items.size(); ++i) {
-            if (items.at(i)->getItemName() == "0.png") {
-                // 把产品放在第一个空位置上
-                items.at(i)->coppyItem(itemsToBeMade.at(productIndex));
-                items.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
-                // 如果改动了第一行的图标，同步修改口袋中的物品
-                if (i < 8) {
-                    pocketItems.at(i)->coppyItem(itemsToBeMade.at(productIndex));
-                    pocketItems.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
-                }
-                break;
-            }
-        }
-    }
+    pickUpItems(productName);            // 把产品添加到背包
 
     // 消耗掉原材料，并更新可以合成的物品
     int IndexInDic = 10 * (productName[0] - '0') + (productName[1] - '0'), line;        // 我们先查一下字典，这是字典该行的第一个字
@@ -281,22 +251,54 @@ void Hero::ClickToProduce(Ref* sender, int itemIndex) {
 
     // 原材料1减去配方中的数量
     findItemCount(ingredient1Name, IndexInbag);
-    items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() - dictionary[line][1]); 
+    items.at(IndexInbag)->setNum(items.at(IndexInbag)->getItemNum() - dictionary[line][1]);
     items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     if (IndexInbag < 8) {
-        pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() - dictionary[line][1]);
+        pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getItemNum() - dictionary[line][1]);
         pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
     }
 
     // 原材料2减去配方中的数量
-    IndexInbag = -1;
-    findItemCount(ingredient2Name, IndexInbag);
-    items.at(IndexInbag)->setNum(items.at(IndexInbag)->getNum() - dictionary[line][3]);
-    items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
-    if (IndexInbag < 8) {
-        pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getNum() - dictionary[line][3]);
-        pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
+    if (ingredient2Name != "0.png") {
+        IndexInbag = -1;
+        findItemCount(ingredient2Name, IndexInbag);
+        items.at(IndexInbag)->setNum(items.at(IndexInbag)->getItemNum() - dictionary[line][3]);
+        items.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
+        if (IndexInbag < 8) {
+            pocketItems.at(IndexInbag)->setNum(pocketItems.at(IndexInbag)->getItemNum() - dictionary[line][3]);
+            pocketItems.at(IndexInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
+        }
     }
 
     this->calculate();
+}
+
+void Hero::pickUpItems(std::string Name) {
+    int positionInbag = -1;                                // 把掉落的物品移动到背包中
+    if (findItemCount(Name, positionInbag) > 0 && Name[0]!='2' && Name[0] != '3') {          // 已有,数量加一    // 后两个条件是希望兼容合成物品时的添加
+        items.at(positionInbag)->setNum(items.at(positionInbag)->getItemNum() + 1);
+        items.at(positionInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
+        if (positionInbag < 8) {
+            pocketItems.at(positionInbag)->setNum(pocketItems.at(positionInbag)->getItemNum() + 1);
+            pocketItems.at(positionInbag)->setCameraMask((unsigned short)CameraFlag::USER1);
+        }
+    }
+    else {
+        for (int i = 0; i < items.size(); ++i) {
+            if (items.at(i)->getItemName() == "0.png") {
+                // 尚未获得，把新物品放在第一个空位置上
+                auto newItem = MyItem::create(Name);
+                items.at(i)->coppyItem(newItem);
+                items.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
+                // 如果改动了第一行的图标，同步修改口袋中的物品
+                if (i < 8) {
+                    pocketItems.at(i)->coppyItem(newItem);
+                    pocketItems.at(i)->setCameraMask((unsigned short)CameraFlag::USER1);
+                }
+                break;
+            }
+        }
+    }
+    if (Name != "10.png" && Name != "11.png")
+        this->calculate();     // 如果不是土、石块，则更新可以合成的物品（土、石块最常见但不能合成任何物品）
 }

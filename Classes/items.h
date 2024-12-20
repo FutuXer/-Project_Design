@@ -11,7 +11,8 @@ public:
     void setItemName(const std::string& name);
     void setNum(int num);
     std::string getItemName() const { return itemName; }
-    int getNum() const { return num; }
+    int getItemNum() const { return num; }
+    int getItemKind() const { return kind; }
     void coppyItem(const MyItem* other);
 
 private:

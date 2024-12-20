@@ -52,14 +52,16 @@ void MyItem::setItemName(const std::string& name) {
 }
 
 void MyItem::setNum(int num) {
-    if (itemNumLabel)
-        itemNumLabel->removeFromParent();          //  清除之前的数字标记
+    if (itemNumLabel != nullptr)
+        itemNumLabel->removeFromParent();            //  清除之前的数字标记
 
     this->num = num;
-    if (this->num > 1) {
+    if (this->num >= 1) {
         itemNumLabel = Label::createWithSystemFont(std::to_string(num), "Arial", 12);
         itemNumLabel->setPosition(Vec2(itemSprite->getContentSize().width / 2, itemSprite->getContentSize().height / 2));
         this->addChild(itemNumLabel);
+        if (this->num == 1)
+            itemNumLabel->setVisible(false);       // 物品数量为1则不显示
     }                                              // 使得Label显现
 
     // 此物品已经被消耗完了

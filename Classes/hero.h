@@ -11,8 +11,15 @@ class Hero :public cocos2d::Sprite
     bool moveRight = false;
     // 跳跃相关
     bool isJumping = false;
+
+    //********怪物相关
+    bool isRecovering = false;  //是否在回血
+    cocos2d::ProgressTimer* healthBar; // 血条
+    cocos2d::Sprite* healthBarBG; //血条背景
+    //********攻击相关
+    bool canAttack = false;
+    bool isOnCooldown = false;
 public:
-    
     static Hero* create(const std::string& filename, int initialHealth)
     {
         Hero* sprite = new (std::nothrow) Hero();
@@ -24,7 +31,6 @@ public:
             return sprite;
         }
         CC_SAFE_DELETE(sprite);
-        // 人物物品栏初始化
         return nullptr;
     }
     void addPhy(); //为主角添加物理刚体性质
@@ -35,6 +41,8 @@ public:
     void setHeroAnimation(const std::string& frame2, const std::string& frame3, const std::string& frame4, const std::string& frame5);
     void checkAndFixHeroCollision(float delta);
 
+    //物品
+    /*物品相关*/
     /*物品相关*/
     void iniItems();                                                            // 初始化所有物品界面
     cocos2d::Vector<MyItem*> items;                                             // 存放所有物品的信息数组
@@ -46,15 +54,16 @@ public:
     void onItemMenuClicked(Ref* sender, int itemIndex);                         // 选择物品
     void ClickToChangePosition(Ref* sender, int itemIndex);                     // 更换物品在背包中的位置
     void ClickToProduce(Ref* sender, int itemIndex);                            // 按下按钮来合成物品（按一次合成一个）
-    void ItemsInHand(int itemTag);                                              // 手中的物品，决定人物的动作
+    void pickUpItems(std::string Name);                                         // 拾取物品
     MyItem* movingItem;                                                         // 正在移动的物品
+    int usingItem;                                                              // 正在被使用的物品（只是序号，根据序号的改编实时调用）
     cocos2d::Sprite* itemInMove;                                                // 显示正在移动的物品（跟随鼠标）
     void calculate();                                                           // 计算目前可以合成的装备                       
     int findItemCount(const std::string& itemName, int& Index) {
         for (int i = 0; i < items.size(); i++) {
             if (items.at(i)->getItemName() == itemName) {
                 Index = i;
-                return items.at(i)->getNum();
+                return items.at(i)->getItemNum();
             }
         }
         return 0; // 没有找到时返回 0
@@ -73,15 +82,39 @@ public:
         52,20,51,0,0,
         0,0,0,0,            // 用来补位，以备后来添加合成的物品
     };
+    // 每一行代表一个物品，第一个是物品编号，第二个是gid
+    int dictionaryToPlace[9][2]{
+        10,4,
+        11,1912,
+        12,347,
+        13,9650,
+        14,6788,
+        40,19211,
+        41,19209,
+        42,19210,
+        43,9757,
+    };
 
-    void addTouchListener();                         // 读入鼠标点击
+    void addTouchListener();                            // 读入鼠标点击
     void addBlockAtPosition(cocos2d::Vec2 position);
     void removeBlockAtPosition(cocos2d::Vec2 position); // 删除泥块的函数
     float getCurrentTime();                             // 获取当前时间的函数声明
+
 
     // 长按相关变量
     int touchStartFrame;
     int touchEndFrame;
     cocos2d::Vec2 touchStartPosition;
     float longPressThreshold = 0.5f; // 长按时间阈值（秒）*/
+
+    //*******怪物相关
+    void takedamage(int damage); //受到伤害
+    void die(); //死亡逻辑
+    void startHealthRecovery(); //回血
+    void stopHealthRecovery(); //在受到攻击时打断回血
+    void addhealthbar(); //添加血条
+    //*******攻击相关
+    void AttackMonsters(); //攻击敌怪
+    void addTouchListenerAttack(); // 读入鼠标点击(攻击)
+    void applyFallDamage(float fallSpeed);  //计算摔落伤害
 };
