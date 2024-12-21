@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="64" height="37" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="1">
+ <tileset firstgid="1" name="Background_276" tilewidth="1024" tileheight="600" tilecount="1" columns="1">
+  <image source="Background_276.png" width="1024" height="600"/>
+ </tileset>
+ <tileset firstgid="2" name="Wall_59" tilewidth="16" tileheight="16" tilecount="319" columns="29">
+  <image source="Wall_59.png" width="468" height="180"/>
+ </tileset>
+ <layer id="1" name="background" width="64" height="37">
+  <data encoding="base64" compression="zlib">
+   eJztzgEJAAAMA6C9f+nHGANNYAIAAAAAAAAAAKy6dqDsASYAAAI=
+  </data>
+ </layer>
+ <layer id="2" name="blocks" width="64" height="37">
+  <data encoding="base64" compression="zlib">
+   eJzt1msKhDAMRtEuQVy9y3JJ/hIkGJumaWv1HhBmcMo0X+IjJQAAAAAAAAD4pvXnh8WmfJ7JXrFW1r+leXPwuKv3zTnU9Fqj1WrNoMWeetPqHDEDy4C12sy3rL/X3FgzeboGZDY1PYpi3cP5O5m3/J7rtWUWanMpmYno+cntPepa8GRU2msPb/+9fbCu63WfiJj/q9mei0/vPa3eh3IZXc9rsx2ds7zny9o9/9fzeVGSKdoamfUBJzYu4Q==
+  </data>
+ </layer>
+</map>
